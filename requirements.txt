@@ -1,0 +1,14 @@
+matplotlib>=3.9.2
+numpy>=2.1.1
+opencv_python>=4.10.0.84
+optuna>=4.0.0
+Pillow>=10.4.0
+PyYAML>=6.0.2
+PyYAML>=6.0.2
+torch>=2.4.1
+torch_summary>=1.4.5
+torchsummary>=1.5.1
+tqdm>=4.66.5
+wandb>=0.18.2
+tensorboardX>=2.6.2.2
+tensorboard>=2.18.0

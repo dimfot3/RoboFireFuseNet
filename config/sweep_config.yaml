@@ -1,0 +1,20 @@
+method: bayes
+metric:
+  name: MIOU
+  goal: maximize
+parameters:
+  LR:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.01
+  WD:
+    distribution: log_uniform_values
+    min: 0.000001
+    max: 0.01
+  BATCHSIZE:
+    distribution: int_uniform
+    min: 5
+    max: 12
+  USE_OHEM:
+    distribution: categorical
+    values: [True, False]
