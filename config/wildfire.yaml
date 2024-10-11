@@ -16,7 +16,7 @@ PRETRAINED: null
 TRAINSET: 'lists/train.txt'
 VALIDSET: 'lists/test.txt'
 TESTSET: 'lists/test.txt'
-ROOTDATASET: '../../Datasets/'
+ROOTDATASET: '../Datasets/'
 NUM_CLASSES: 3
 CLS_NAMES: ['bg', 'smoke', 'fire']
 MODE: 'fusion'

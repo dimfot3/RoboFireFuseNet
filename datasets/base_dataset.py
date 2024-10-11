@@ -24,7 +24,8 @@ class BaseDataset(data.Dataset):
         self.crop_size = crop_size
         self.ignore_label = ignore_label
 
-        self.mean = mean
+        self.mean_rgb = mean
+        self.mean_ir = mean[0]
         self.std = std
         self.scale_factor = scale_factor
 
@@ -33,16 +34,17 @@ class BaseDataset(data.Dataset):
     def __len__(self):
         return len(self.files)
 
-    def input_transform(self, image):
+    def input_transform(self, images):
         """
         Read the image and do the following steps:
             2) normalize the images by scaling to 0,1 and removing mean and divide with std
         """
-        image = image.astype(np.float32)
-        image = image / 255.0
-        image -= self.mean
-        image /= self.std
-        return image
+        for i, image in enumerate(images):
+            image = image.astype(np.float32)
+            image = image / 255.0
+            image -= self.mean if image.shape[-1]
+            images[i] = image / self.std
+        return images
 
     def label_transform(self, label):
         """
@@ -64,13 +66,14 @@ class BaseDataset(data.Dataset):
                                            value=padvalue)
         return pad_image
 
-    def rand_crop(self, image, label, edge):
+    def rand_crop(self, images, label, edge):
         """
         Random crop images in dimension where there are less than self.crop_size
         """
-        h, w = image.shape[:-1]
-        image = self.pad_image(image, h, w, self.crop_size,
-                               (0.0, 0.0, 0.0))
+        h, w = images[0].shape[:-1]
+        for i, image in enumerate(images):
+            images[i] = self.pad_image(image, h, w, self.crop_size,
+                                (0.0, 0.0, 0.0))
         label = self.pad_image(label, h, w, self.crop_size,
                                (self.ignore_label,))
         edge = self.pad_image(edge, h, w, self.crop_size,
@@ -79,64 +82,57 @@ class BaseDataset(data.Dataset):
         new_h, new_w = label.shape
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
-        image = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]
+        for i, image in enumerate(images):
+            images[i] = image[y:y+self.crop_size[0], x:x+self.crop_size[1]]
         label = label[y:y+self.crop_size[0], x:x+self.crop_size[1]]
         edge = edge[y:y+self.crop_size[0], x:x+self.crop_size[1]]
-        if(len(image.shape) == 2):
-            image = image.reshape(image.shape[0], image.shape[1], 1)
-        return image, label, edge
+        return images, label, edge
 
-    def multi_scale_aug(self, image, label=None, edge=None,
+    def multi_scale_aug(self, images, label=None, edge=None,
                         rand_scale=1, rand_crop=True):
         """
         Randomly changes the scale of an image
         """
         long_size = int(self.base_size * rand_scale + 0.5)
-        h, w = image.shape[:2]
+        h, w = images[0].shape[:2]
         if h > w:
             new_h = long_size
             new_w = int(w * long_size / h + 0.5)
         else:
             new_w = long_size
             new_h = int(h * long_size / w + 0.5)
-
-        image = cv2.resize(image, (new_w, new_h),
-                           interpolation=cv2.INTER_LINEAR)
-        if(len(image.shape) == 2):
-            image = image.reshape(image.shape[0], image.shape[1], 1)
+        for i, image in enumerate(images):
+            images[i] = cv2.resize(image, (new_w, new_h),
+                            interpolation=cv2.INTER_LINEAR).reshape(new_w, new_h, -1)
         if label is not None:
             label = cv2.resize(label, (new_w, new_h),
-                               interpolation=cv2.INTER_NEAREST)
+                            interpolation=cv2.INTER_NEAREST)
             if edge is not None:
                 edge = cv2.resize(edge, (new_w, new_h),
-                                   interpolation=cv2.INTER_NEAREST)
+                                interpolation=cv2.INTER_NEAREST)
         else:
-            return image
+            return images
         if rand_crop:
-            image, label, edge = self.rand_crop(image, label, edge)
-        return image, label, edge
+            images, label, edge = self.rand_crop(images, label, edge)
+        return images, label, edge
 
-    def change_brightness(self, image):
+    def change_brightness(self, images):
         brightness_factor = 0.5 + np.random.rand(1)
-        float_image = image.astype(np.float32)
-        brightened_image = float_image * brightness_factor
-        brightened_image = np.clip(brightened_image, 0, 255).astype(np.uint8)
-        return brightened_image
+        for i, image in enumerate(images):
+            float_image = image.astype(np.float32)
+            brightened_image = float_image * brightness_factor
+            images[i] = np.clip(brightened_image, 0, 255).astype(np.uint8)
+        return images
 
-    def adjust_contrast(self, image):
-        float_image = image.astype(np.float32)
-        mean = np.mean(float_image, axis=(0, 1), keepdims=True)
-        contrast_image = (float_image - mean) * (np.random.random((1, )) + 0.5) + mean
-        contrast_image = np.clip(contrast_image, 0, 255).astype(np.uint8)
-        return contrast_image
-    
-    def hide_one_source(self, image):
-        source = np.random.randint(0,2,1)
-        idxs = [[0,1,2], [3]]
-        image[idxs[source]] = 0
-        return image
+    def adjust_contrast(self, images):
+        for i, image in enumerate(images):
+            float_image = image.astype(np.float32)
+            mean = np.mean(float_image, axis=(0, 1), keepdims=True)
+            contrast_image = (float_image - mean) * (np.random.random((1, )) + 0.5) + mean
+            images[i] = np.clip(contrast_image, 0, 255).astype(np.uint8)
+        return images
 
-    def gen_sample(self, image, label,
+    def gen_sample(self, images, label,
                    multi_scale=True, is_flip=True, edge_pad=True, edge_size=4, brightness=True, contrast=True, single_source=False):
         """
         generate a training sample by applying augmentation, then generates edge label with cv2 and then 
@@ -151,17 +147,15 @@ class BaseDataset(data.Dataset):
         
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
-            image, label, edge = self.multi_scale_aug(image, label, edge,
+            images, label, edge = self.multi_scale_aug(images, label, edge,
                                                 rand_scale=rand_scale)            
         if brightness and (np.random.random() > 0.85):
-            image = self.change_brightness(image)
+            images = self.change_brightness(images)
         if contrast and (np.random.random() > 0.85):
-            image = self.adjust_contrast(image)
-        if single_source and (np.random.random() > 0.75):
-            image = self.adjust_contrast(image)
-        image = self.input_transform(image)
+            images = self.adjust_contrast(images)
+        images = self.input_transform(images)
         label = self.label_transform(label)
-        image = image.transpose((2, 0, 1))
+        images = image.transpose((0, 3, 1, 2))
 
         if is_flip:
             flip = np.random.choice(2) * 2 - 1
