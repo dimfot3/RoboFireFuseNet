@@ -17,7 +17,6 @@ class WildFire(BaseDataset):
                  flip=True, 
                  brightness=True,
                  contrast=True,
-                 single_source=False,
                  ignore_label=255, 
                  base_size=1024, 
                  crop_size=(720, 960),
@@ -25,11 +24,11 @@ class WildFire(BaseDataset):
                  mean=[0, 0, 0, 0],
                  std=[1, 1, 1, 1],
                  bd_dilate_size=4, 
-                 mode='rgb'):
+                 n_stack=5,
+                 frames_appart=210):
 
-        indices = {'rgb': [0, 1, 2], 'ir': [3], 'fusion': [0, 1, 2, 3]}      
-        self.mean = [mean[i] for i in indices[mode]]
-        self.std = [std[i] for i in indices[mode]]
+        self.mean = mean
+        self.std = std
         super(WildFire, self).__init__(ignore_label, base_size,
                 crop_size, scale_factor, self.mean, self.std)
 
@@ -47,9 +46,8 @@ class WildFire(BaseDataset):
         self.color_list = [[0, 0, 0], [125, 125, 125],[255, 255, 255]]
         self.class_weights = None
         self.bd_dilate_size = bd_dilate_size
-        self.single_source = single_source
-        self.mode = mode
-        self.n_stack = 5
+        self.n_stack = n_stack
+        self.frames_appart = frames_appart
 
     
     def read_files(self):
@@ -80,9 +78,12 @@ class WildFire(BaseDataset):
         return color_map.astype(np.uint8)
     
     def find_closest_images(self, target_id, k):
-        lower_bound = target_id - k
+        bounds = [[0, 8100], [8100, 9000], [9000, 100000]] # TODO fill the bounds
+        idx = next((i for i, (low, high) in enumerate(bounds) if low <= target_id < high), None)
+        lower_bound = max(bounds[idx][0], target_id - k)
         ids = np.arange(max(1, target_id - k), target_id)
-        cand_ids = np.append(np.random.choice([image_id for image_id in ids if lower_bound <= image_id < target_id], min(self.n_stack, len(ids)), replace=False), target_id).astype('int')
+        cand_ids = np.append(np.random.choice([image_id for image_id in ids if lower_bound <= image_id < target_id], \
+                                              min(self.n_stack, len(ids)), replace=False), target_id).astype('int')
         cand_ids.sort()
         modes = ['rgb', 'ir']
         closest_filenames = [f'img_{modes[np.random.randint(0, 2)]}_({image_id}).png' for image_id in cand_ids]
@@ -92,7 +93,7 @@ class WildFire(BaseDataset):
         item = self.files[index]
         name, target_id = item["name"], int(re.search(r'img_\((\d+)\)', item["name"]).group(1))
         img_folder = os.path.join(self.root, '/'.join(item['img'].split('/')[:2]))
-        images = self.find_closest_images(target_id, 10)
+        images = self.find_closest_images(target_id, self.frames_appart)
         color_map = Image.open(os.path.join(self.root,item["label"])).convert('RGB')
         color_map = np.array(color_map)
         label = self.color2label(color_map)
@@ -101,10 +102,7 @@ class WildFire(BaseDataset):
         images, label, edge = self.gen_sample(images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
                                 edge_size=self.bd_dilate_size, brightness=self.brightness, contrast=self.contrast)
-        print(images[0].shape)
-        exit()
-        image = None
-        return image.copy(), label.copy(), edge.copy(), np.array(size), name
+        return images, label.copy(), edge.copy(), name
 
     def single_scale_inference(self, config, model, image):
         pred = self.inference(config, model, image)
@@ -136,20 +134,28 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../../Datasets/',
-                          list_path='lists/train_flm.txt',
+                          list_path='lists/trainflm.txt',
                           num_classes=3,
                           multi_scale=True,
                           flip=True,
                           brightness=True,
                           contrast=True,
-                          single_source=False,
                           ignore_label=255,
                           scale_factor=9,
                           crop_size=[272, 336],
                           base_size=336,
-                          bd_dilate_size=4)
-    for i in np.random.choice(len(dataset), 3):
-        img, label, edge, size, _ = dataset[i]
+                          bd_dilate_size=4,
+                          n_stack=4,
+                          frames_appart=210)
+    for i in np.random.choice(len(dataset), 1):
+        images, label, edge, name = dataset[i]
+        f, ax = plt.subplots(1, len(images))
+        print(name)
+        for i, img in enumerate(images):
+            img = (img * 255).astype('int')
+            img = np.transpose(img, (1, 2, 0))
+            ax[i].imshow(img)
+        plt.show()
         
 
         

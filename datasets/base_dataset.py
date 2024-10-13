@@ -17,16 +17,17 @@ class BaseDataset(data.Dataset):
                  base_size=2048,
                  crop_size=(512, 1024),
                  scale_factor=16,
-                 mean=[0, 0, 0],
-                 std=[1, 1, 1]):
+                 mean=[0, 0, 0, 0],
+                 std=[1, 1, 1, 1]):
 
         self.base_size = base_size
         self.crop_size = crop_size
         self.ignore_label = ignore_label
 
-        self.mean_rgb = mean
-        self.mean_ir = mean[0]
-        self.std = std
+        self.mean_rgb = mean[:3]
+        self.mean_ir = mean[3]
+        self.std_rgb = std[:3]
+        self.std_ir = std[3]
         self.scale_factor = scale_factor
 
         self.files = []
@@ -42,8 +43,9 @@ class BaseDataset(data.Dataset):
         for i, image in enumerate(images):
             image = image.astype(np.float32)
             image = image / 255.0
-            image -= self.mean if image.shape[-1]
-            images[i] = image / self.std
+            image = image - (self.mean_rgb if image.shape[-1] == 3 else self.mean_ir)
+            image = image / (self.std_rgb if image.shape[-1] == 3 else self.std_ir)
+            images[i] = image
         return images
 
     def label_transform(self, label):
@@ -61,9 +63,13 @@ class BaseDataset(data.Dataset):
         pad_h = max(int(size[0]) - h, 0)
         pad_w = max(int(size[1]) - w, 0)
         if pad_h > 0 or pad_w > 0:
+            
             pad_image = cv2.copyMakeBorder(image, 0, pad_h, 0,
                                            pad_w, cv2.BORDER_CONSTANT,
                                            value=padvalue)
+        if len(image.shape) == 3:
+            n_ch = image.shape[-1]
+            pad_image = np.resize(pad_image, (pad_image.shape[0], pad_image.shape[1], n_ch))
         return pad_image
 
     def rand_crop(self, images, label, edge):
@@ -78,7 +84,6 @@ class BaseDataset(data.Dataset):
                                (self.ignore_label,))
         edge = self.pad_image(edge, h, w, self.crop_size,
                                (0.0,))
-
         new_h, new_w = label.shape
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
@@ -102,8 +107,9 @@ class BaseDataset(data.Dataset):
             new_w = long_size
             new_h = int(h * long_size / w + 0.5)
         for i, image in enumerate(images):
-            images[i] = cv2.resize(image, (new_w, new_h),
-                            interpolation=cv2.INTER_LINEAR).reshape(new_w, new_h, -1)
+            n_ch = images[i].shape[-1]
+            images[i] = np.resize(cv2.resize(image, (new_w, new_h),
+                            interpolation=cv2.INTER_LINEAR), (new_w, new_h, n_ch))
         if label is not None:
             label = cv2.resize(label, (new_w, new_h),
                             interpolation=cv2.INTER_NEAREST)
@@ -144,7 +150,6 @@ class BaseDataset(data.Dataset):
             edge = edge[y_k_size:-y_k_size, x_k_size:-x_k_size]
             edge = np.pad(edge, ((y_k_size,y_k_size),(x_k_size,x_k_size)), mode='constant')
         edge = (cv2.dilate(edge, kernel, iterations=1)>50)*1.0
-        
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             images, label, edge = self.multi_scale_aug(images, label, edge,
@@ -155,15 +160,16 @@ class BaseDataset(data.Dataset):
             images = self.adjust_contrast(images)
         images = self.input_transform(images)
         label = self.label_transform(label)
-        images = image.transpose((0, 3, 1, 2))
+        images = [image.transpose(2, 0, 1) for image in images]
 
         if is_flip:
             flip = np.random.choice(2) * 2 - 1
-            image = image[:, :, ::flip]
             label = label[:, ::flip]
             edge = edge[:, ::flip]
+            for i, image in enumerate(images):
+                images[i] = image[:, :, ::flip]
 
-        return image, label, edge
+        return images, label, edge
 
 
     def inference(self, config, model, image):
