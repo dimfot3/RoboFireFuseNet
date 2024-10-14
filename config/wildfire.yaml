@@ -17,6 +17,7 @@ TRAINSET: 'lists/train_flm.txt'
 VALIDSET: 'lists/test.txt'
 TESTSET: 'lists/test.txt'
 ROOTDATASET: '../Datasets/'
+MAX_FR_APART: 180
 NUM_CLASSES: 3
 CLS_NAMES: ['bg', 'smoke', 'fire']
 MODE: 'fusion'

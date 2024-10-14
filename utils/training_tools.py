@@ -105,7 +105,7 @@ def get_dataset(args):
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
                           n_stack=3,
-                          frames_appart=210) 
+                          frames_appart=args['MAX_FR_APART']) 
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
                           num_classes=args['NUM_CLASSES'],
@@ -119,7 +119,7 @@ def get_dataset(args):
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
                           n_stack=3,
-                          frames_appart=210)
+                          frames_appart=args['MAX_FR_APART'])
     return train_dataset, val_dataset
 
 def get_model(args):
