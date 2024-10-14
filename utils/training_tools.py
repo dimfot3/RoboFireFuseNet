@@ -41,7 +41,7 @@ class Trainer:
     def valid_step(self, batch):
         self.model.eval()
         images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[4]
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
         output = self.model(images)
         output_mask = F.interpolate(
                             output[1],

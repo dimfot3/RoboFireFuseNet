@@ -2,7 +2,7 @@
 # general
 PROJECTNAME: 'test'
 SESSIONAME: 'test'
-DEVICE: 'cpu'
+DEVICE: 'cuda:1'
 NUM_WORKERS: 10
 ONLINELOG: False
 SEED: 200
@@ -14,7 +14,7 @@ NUM_OUTPUTS: 2
 PRETRAINED: null
 # data
 TRAINSET: 'lists/train_flm.txt'
-VALIDSET: 'lists/test.txt'
+VALIDSET: 'lists/train_flm.txt'
 TESTSET: 'lists/test.txt'
 ROOTDATASET: '../Datasets/'
 MAX_FR_APART: 180
@@ -36,14 +36,14 @@ BASE_SIZE: 336
 CLASS_WEIGHTS: [0.11, 0.14, 0.75]
 ALIGN_CORNERS: True
 # loss and optimization
-LR: 0.0078
-BATCHSIZE: 5
-EPOCHS: 4
+LR: 0.005647243
+BATCHSIZE: 12
+EPOCHS: 200
 OPTIM: 'SGD'
-USE_OHEM: true
+USE_OHEM: False
 OHEMTHRES: 0.9
 OHEMKEEP: 131072
-WD: 0.00001378
+WD: 0.0000018551
 MOMENTUM: 0.9
 NESTEROV: false
 BALANCE_WEIGHTS: [0.4, 1.0]

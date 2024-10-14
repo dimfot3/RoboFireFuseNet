@@ -192,11 +192,12 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         batch = next(valid_loader)
         images = batch[0]
         outputs = inf_model(images)
-        images = (images[0].detach().cpu().numpy() * 255).astype('uint8')
+        images = (images[0][-3:].detach().cpu().numpy() * 255).astype('uint8')
+        images = images if images[:2].sum() > 0.2 else np.resize(images[0], (1, images.shape[1], images.shape[2]))
         outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
         non_bg_idxs = outputs!=0
         outputs = val_data.label2color(outputs)
-        images = np.transpose(images, (1, 2, 0))[:, :, :3]
+        images = np.transpose(images, (1, 2, 0))
         images[non_bg_idxs] = outputs[non_bg_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
