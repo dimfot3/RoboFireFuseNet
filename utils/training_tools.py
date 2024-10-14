@@ -24,7 +24,7 @@ class Trainer:
         self.model.train()
         self.optimizer.zero_grad()
         images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[4]
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
         output = self.model(images)
         output_mask = F.interpolate(
                             output[1],
@@ -99,13 +99,13 @@ def get_dataset(args):
                           flip=args['FLIP'],
                           brightness=args['BRIGHTNESS'],
                           contrast=args['CONTRAST'],
-                          single_source=args['SINGLE_SOURCE_AUG'],
                           ignore_label=args['IGNORE_LABEL'],
                           scale_factor=args['SCALE_FACTOR'],
                           crop_size=args['CROP_SIZE'],
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
-                          mode=args['MODE']) 
+                          n_stack=3,
+                          frames_appart=210) 
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
                           num_classes=args['NUM_CLASSES'],
@@ -113,23 +113,22 @@ def get_dataset(args):
                           flip=False,
                           brightness=False,
                           contrast=False,
-                          single_source=False,
                           ignore_label=args['IGNORE_LABEL'],
                           scale_factor=args['SCALE_FACTOR'],
                           crop_size=args['CROP_SIZE'],
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
-                          mode=args['MODE'])
+                          n_stack=3,
+                          frames_appart=210)
     return train_dataset, val_dataset
 
 def get_model(args):
-    channels = {'rgb': 3, 'ir': 1, 'fusion': 4}
     if 'pidnet_s' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']])
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=12)
     elif 'pidnet_m' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']])
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=12)
     elif 'pidnet_l' == args['MODEL']:
-        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=channels[args['MODE']])
+        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=12)
     if args['PRETRAINED'] is not None:
         model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu'))
     model.to(device=args['DEVICE'])

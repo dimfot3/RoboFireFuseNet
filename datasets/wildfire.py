@@ -102,6 +102,10 @@ class WildFire(BaseDataset):
         images, label, edge = self.gen_sample(images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
                                 edge_size=self.bd_dilate_size, brightness=self.brightness, contrast=self.contrast)
+        for i, img in enumerate(images):
+            if img.shape[0] == 1:
+                images[i] = np.append(images[i], np.zeros((2, images[i].shape[1], images[i].shape[2])), axis=0)
+        images = np.concatenate(images, axis=0)
         return images, label.copy(), edge.copy(), name
 
     def single_scale_inference(self, config, model, image):
@@ -134,7 +138,7 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../../Datasets/',
-                          list_path='lists/trainflm.txt',
+                          list_path='lists/train_flm.txt',
                           num_classes=3,
                           multi_scale=True,
                           flip=True,
@@ -147,7 +151,7 @@ if __name__ == '__main__':
                           bd_dilate_size=4,
                           n_stack=4,
                           frames_appart=210)
-    for i in np.random.choice(len(dataset), 1):
+    for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
         f, ax = plt.subplots(1, len(images))
         print(name)

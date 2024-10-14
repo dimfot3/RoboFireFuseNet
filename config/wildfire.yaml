@@ -13,7 +13,7 @@ MODEL: 'pidnet_s'
 NUM_OUTPUTS: 2
 PRETRAINED: null
 # data
-TRAINSET: 'lists/train.txt'
+TRAINSET: 'lists/train_flm.txt'
 VALIDSET: 'lists/test.txt'
 TESTSET: 'lists/test.txt'
 ROOTDATASET: '../Datasets/'
@@ -36,7 +36,7 @@ CLASS_WEIGHTS: [0.11, 0.14, 0.75]
 ALIGN_CORNERS: True
 # loss and optimization
 LR: 0.0078
-BATCHSIZE: 12
+BATCHSIZE: 5
 EPOCHS: 4
 OPTIM: 'SGD'
 USE_OHEM: true
