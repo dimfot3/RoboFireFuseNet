@@ -78,12 +78,16 @@ class WildFire(BaseDataset):
         return color_map.astype(np.uint8)
     
     def find_closest_images(self, target_id, k):
-        bounds = [[0, 8100], [8100, 9000], [9000, 100000]] # TODO fill the bounds
+
+        bounds = [[1, 8600], [8601, 13700], [13700, 19899], [19900, 25695], \
+                  [25696, 27514], [27515, 31509], [31510, 33929], [33930, 37189],   \
+                  [37189, 40108], [40109, 41100], [41101, 44699], [44700, 46259],   \
+                  [46260, 53451], [53451, 100000]] # TODO fill the bounds
         idx = next((i for i, (low, high) in enumerate(bounds) if low <= target_id < high), None)
         lower_bound = max(bounds[idx][0], target_id - k)
         ids = np.arange(max(1, target_id - k), target_id)
         cand_ids = np.append(np.random.choice([image_id for image_id in ids if lower_bound <= image_id < target_id], \
-                                              min(self.n_stack, len(ids)), replace=False), target_id).astype('int')
+                                              min(self.n_stack, len(ids)), replace=True), target_id).astype('int')
         cand_ids.sort()
         modes = ['rgb', 'ir']
         closest_filenames = [f'img_{modes[np.random.randint(0, 2)]}_({image_id}).png' for image_id in cand_ids]
