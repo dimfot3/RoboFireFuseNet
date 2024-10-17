@@ -8,7 +8,7 @@ from .scheduler import CustomPolynomialDecayLR
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
-
+from models.AsyncModel import AsyncModel
 
 class Trainer:
     def __init__(self, args, model, len_data):
@@ -129,6 +129,10 @@ def get_model(args):
         model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=12)
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=12)
+    elif 'async_s' == args['MODEL']:
+        model = AsyncModel(64)
+    elif 'async_m' == args['MODEL']:
+        model = AsyncModel(128)
     if args['PRETRAINED'] is not None:
         model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu'))
     model.to(device=args['DEVICE'])

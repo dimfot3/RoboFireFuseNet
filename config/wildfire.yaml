@@ -2,14 +2,14 @@
 # general
 PROJECTNAME: 'test'
 SESSIONAME: 'test'
-DEVICE: 'cuda:1'
+DEVICE: 'cpu'
 NUM_WORKERS: 10
 ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 12
 VALID_FREQ: 2
 # model
-MODEL: 'pidnet_s'
+MODEL: 'async_s'
 NUM_OUTPUTS: 2
 PRETRAINED: null
 # data

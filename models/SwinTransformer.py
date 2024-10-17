@@ -123,7 +123,7 @@ class SwinTransformer(nn.Module):
     In this Implementation, the standard shape of data is (b h w c), which is a similar protocal as cnn.
     """
     #TODO make layers using configs
-    def __init__(self, config=[2,2], dim=96, drop_path_rate=0.2, input_resolution=252):
+    def __init__(self, config=[2,2], dim=96, drop_path_rate=0.2, input_resolution=252, input_c=3):
         super(SwinTransformer, self).__init__()
         self.config = config
         self.dim = dim
@@ -134,7 +134,7 @@ class SwinTransformer(nn.Module):
         # drop path rate for each layer
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
 
-        self.prestages = [nn.Sequential(nn.Conv2d(3, dim, kernel_size=4, stride=4),
+        self.prestages = [nn.Sequential(nn.Conv2d(input_c, dim, kernel_size=4, stride=4),
                        Rearrange('b c h w -> b h w c'),
                        nn.LayerNorm(dim))] + \
                        [nn.Sequential(Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
@@ -172,5 +172,5 @@ if __name__ == '__main__':
     n_parameters = sum(p.numel() for p in test_model.parameters() if p.requires_grad)
     dummy_input = torch.rand(3, 3, 256, 256)
     output, q_arr, k_arr, v_arr = test_model(dummy_input)
-    print(output.size(), len(q_arr))
+    print(output.size(), len(q_arr), q_arr[0].shape)
 
