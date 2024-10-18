@@ -126,12 +126,12 @@ class CrossSwinTransformer(nn.Module):
         # drop path rate for each layer
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
 
-        self.prestages = [nn.Sequential(nn.Conv2d(3, dim, kernel_size=4, stride=4),
+        self.prestages = nn.ModuleList([nn.Sequential(nn.Conv2d(3, dim, kernel_size=4, stride=4),
                        Rearrange('b c h w -> b h w c'),
                        nn.LayerNorm(dim))] + \
                        [nn.Sequential(Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
-                       nn.LayerNorm((4*i)*dim), nn.Linear((4*i)*dim, (2*i)*dim, bias=False)) for i in range(1, len(config))]
-        self.tf_arr = []
+                       nn.LayerNorm((4*i)*dim), nn.Linear((4*i)*dim, (2*i)*dim, bias=False)) for i in range(1, len(config))])
+        self.tf_arr = nn.ModuleList([])
         for i_tf, n_tf in enumerate(self.config):
             for i in range(n_tf):
                 mode = 'W' if ((i % 2)==0) else 'SW'
@@ -157,9 +157,9 @@ class CrossSwinTransformer(nn.Module):
         return x
 
 if __name__ == '__main__':
-    dummy_input = torch.rand(3, 3, 256, 256)
-    temp_m = SwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256)
-    model = CrossSwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256)
+    dummy_input = torch.rand(3, 3, 256, 256).cuda()
+    temp_m = SwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256).cuda()
+    model = CrossSwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256).cuda()
     x, q, k, v = temp_m(dummy_input)
     output = model(dummy_input, q, k, v)
     print(output.size())

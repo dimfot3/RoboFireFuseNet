@@ -134,17 +134,17 @@ class SwinTransformer(nn.Module):
         # drop path rate for each layer
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
 
-        self.prestages = [nn.Sequential(nn.Conv2d(input_c, dim, kernel_size=4, stride=4),
+        self.prestages = nn.ModuleList([nn.Sequential(nn.Conv2d(input_c, dim, kernel_size=4, stride=4),
                        Rearrange('b c h w -> b h w c'),
                        nn.LayerNorm(dim))] + \
                        [nn.Sequential(Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
-                       nn.LayerNorm((4*i)*dim), nn.Linear((4*i)*dim, (2*i)*dim, bias=False)) for i in range(1, len(config))]
-        self.tf_arr = []
+                       nn.LayerNorm((4*i)*dim), nn.Linear((4*i)*dim, (2*i)*dim, bias=False)) for i in range(1, len(config))])
+        self.tf_arr = nn.ModuleList([])
         for i_tf, n_tf in enumerate(self.config):
             for i in range(n_tf):
                 mode = 'W' if ((i % 2)==0) else 'SW'
                 self.tf_arr.append(Block((2**i_tf) * dim, (2**i_tf) * dim, self.head_dim, self.window_size, 
-                                    dpr[i], mode, input_resolution//(4 * (2**i_tf))))        
+                                    dpr[i], mode, input_resolution//(4 * (2**i_tf))))  
         self.apply(self._init_weights)
 
     def _init_weights(self, m):
@@ -168,9 +168,10 @@ class SwinTransformer(nn.Module):
         return x, q_arr, k_arr, v_arr
 
 if __name__ == '__main__':
-    test_model = SwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256)
+    test_model = SwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256).cuda()
     n_parameters = sum(p.numel() for p in test_model.parameters() if p.requires_grad)
-    dummy_input = torch.rand(3, 3, 256, 256)
+    dummy_input = torch.rand(3, 3, 256, 256).cuda()
     output, q_arr, k_arr, v_arr = test_model(dummy_input)
     print(output.size(), len(q_arr), q_arr[0].shape)
+    summary(test_model, dummy_input)
 

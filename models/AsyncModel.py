@@ -11,7 +11,7 @@ import numpy as np
 
 
 class AsyncModel(nn.Module):
-    def __init__(self, in_planes):
+    def __init__(self, in_planes, device='cuda:0'):
         super(AsyncModel, self).__init__()
         self.in_planes = in_planes
         self.input_res = 256
@@ -50,7 +50,6 @@ class AsyncModel(nn.Module):
         
         rgbs = img_arr[rgb_idxs]
         irs = img_arr[ir_idxs][:, :1]
-
         x_rgb, q_rgb, k_rgb, v_rgb = self.rgb_tf(rgbs)
         x_ir, q_ir, k_ir, v_ir = self.ir_tf(irs)
         q = [torch.cat([q1, q2], dim=1)[:, rev_idxs][:, mask_old]
