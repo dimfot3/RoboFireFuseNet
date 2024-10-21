@@ -52,3 +52,11 @@ class CosineDecay:
 
     def get_last_lr(self):
         return [group['lr'] for group in self.optimizer.param_groups]
+    
+    def state_dict(self):
+        return {
+            'cur_epoch': self.cur_epoch
+        }
+
+    def load_state_dict(self, state_dict):
+        self.cur_epoch = state_dict['cur_epoch']

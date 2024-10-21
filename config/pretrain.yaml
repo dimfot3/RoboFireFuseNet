@@ -2,23 +2,24 @@
 # general
 PROJECTNAME: 'Async'
 SESSIONAME: 'Pretrainingv0'
-DEVICE: 'cuda:0'
+DEVICE: 'cpu'
 NUM_WORKERS: 16
-ONLINELOG: True
+ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 12
-VALID_FREQ: 100
+VALID_FREQ: 2
 UPDATE_FREQ: 2
 WARMUP: 3
 # model
 MODEL: 'async_s'
 NUM_OUTPUTS: 2
 PRETRAINED: null
+CHECKPOINT: 'checkpoint_epoch_0_28.pth'
 # data
 TRAINSET: 'lists/train_flm.txt'
 VALIDSET: 'lists/train_flm.txt'
 TESTSET: 'lists/test.txt'
-ROOTDATASET: '/media/FastData/nmilitsis/CPP/data/ImageNet/train'
+ROOTDATASET: '../Datasets/FINLAND'
 MAX_FR_APART: 180
 NUM_CLASSES: 3
 CLS_NAMES: ['bg', 'smoke', 'fire']
@@ -39,7 +40,7 @@ CLASS_WEIGHTS: [0.11, 0.14, 0.75]
 ALIGN_CORNERS: True
 # loss and optimization
 LR: 0.00015
-BATCHSIZE: 128
+BATCHSIZE: 6
 EPOCHS: 1600
 OPTIM: 'ADAM'
 USE_OHEM: False

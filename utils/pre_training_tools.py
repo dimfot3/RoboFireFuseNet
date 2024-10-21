@@ -24,7 +24,10 @@ class Trainer:
         self.ingore_label = args['IGNORE_LABEL']
         self.update_freq = args['UPDATE_FREQ']
         self.iter_counter = 1
-
+        self.start_epoch = 0
+        if args['CHECKPOINT'] != None:
+            self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
+           
     def training_step(self, batch):
         self.model.train()
         images, labels, mask = batch[0].to(dtype=torch.float, device=self.device), \
@@ -91,6 +94,23 @@ class Trainer:
         if self.counter >= self.args['STOPCOUNTER']:
             return True
         return False
+    
+    def save_checkpoint(self, path, epoch, itter=0):
+        os.makedirs(f'{path}', exist_ok=True)
+        checkpoint = {
+            'epoch': epoch + 1,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict()
+        }
+        torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}_{itter}.pth'))
+
+    def load_checkpoint(self, path):
+        checkpoint = torch.load(path)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        self.start_epoch = checkpoint['epoch']
 
 def get_dataset(args):
     transform_train = transforms.Compose([
