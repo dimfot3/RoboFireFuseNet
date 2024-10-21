@@ -12,6 +12,7 @@ def train(model, train_data, args, logger):
     trainer = Trainer(args, model, len(train_data))
     for epoch in range(args['EPOCHS']):
         running_loss = 0
+        trainer.optimizer.zero_grad()
         # train loop
         for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}'):
             loss = trainer.training_step(batch)

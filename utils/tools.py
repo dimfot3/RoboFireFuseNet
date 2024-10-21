@@ -221,11 +221,11 @@ def qualitive_eval_pretrain(inf_model, val_data, ex_path='./outputs', name='exam
     for sampleid in range(5):
         batch = next(valid_loader)
         images, labels = batch[0], batch[1]
-        outputs = inf_model(images)[0]
+        outputs = inf_model(images)
         images = (np.transpose(labels[0].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) 
-                  + np.array([0.485, 0.456, 0.406])).astype('uint8')
+                  + np.array([0.485, 0.456, 0.406])).clip(0, 1)
         outputs = (np.transpose(outputs[0].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) 
-                  + np.array([0.485, 0.456, 0.406])).astype('uint8')
+                  + np.array([0.485, 0.456, 0.406])).clip(0, 1)
         ax[0][sampleid].imshow(images, aspect='auto')
         ax[1][sampleid].imshow(outputs, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)

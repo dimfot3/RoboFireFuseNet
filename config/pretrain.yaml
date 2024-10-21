@@ -2,12 +2,14 @@
 # general
 PROJECTNAME: 'test'
 SESSIONAME: 'test'
-DEVICE: 'cuda'
+DEVICE: 'cpu'
 NUM_WORKERS: 10
 ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 12
 VALID_FREQ: 2
+UPDATE_FREQ: 8
+WARMUP: 40
 # model
 MODEL: 'async_s'
 NUM_OUTPUTS: 2
@@ -16,7 +18,7 @@ PRETRAINED: null
 TRAINSET: 'lists/train_flm.txt'
 VALIDSET: 'lists/train_flm.txt'
 TESTSET: 'lists/test.txt'
-ROOTDATASET: '../Datasets/FINLAND'
+ROOTDATASET: '/media/FastData/nmilitsis/CPP/data/ImageNet'
 MAX_FR_APART: 180
 NUM_CLASSES: 3
 CLS_NAMES: ['bg', 'smoke', 'fire']
@@ -36,10 +38,10 @@ BASE_SIZE: 336
 CLASS_WEIGHTS: [0.11, 0.14, 0.75]
 ALIGN_CORNERS: True
 # loss and optimization
-LR: 0.005647243
+LR: 0.00015
 BATCHSIZE: 12
-EPOCHS: 200
-OPTIM: 'SGD'
+EPOCHS: 1600
+OPTIM: 'ADAM'
 USE_OHEM: False
 OHEMTHRES: 0.9
 OHEMKEEP: 131072

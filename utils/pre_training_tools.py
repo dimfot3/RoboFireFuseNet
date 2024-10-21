@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import os
 from .tools import get_confusion_matrix
 from .total_loss import MaskedMSELoss
-from .scheduler import CustomPolynomialDecayLR
+from .scheduler import CosineDecay
 import torch.optim as optim
 from models.pidnet import PIDNet
 from models.AsyncModel import AsyncModel
@@ -18,14 +18,15 @@ class Trainer:
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
-        self.scheduler = self.get_scheduler(args['LR'], (np.ceil(len_data / args['BATCHSIZE'])) * args['EPOCHS'])
+        self.scheduler = self.get_scheduler(args['LR'], args['EPOCHS'], np.ceil(len_data / args['BATCHSIZE']), args['WARMUP'])
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
+        self.update_freq = args['UPDATE_FREQ']
+        self.iter_counter = 1
 
     def training_step(self, batch):
         self.model.train()
-        self.optimizer.zero_grad()
         images, labels, mask = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.long, device=self.device)
         output = self.model(images)
@@ -34,11 +35,15 @@ class Trainer:
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
         loss = self.criterion.get_loss(output_mask, labels, mask)
-        loss = loss.mean()
+        loss = loss.mean() / self.update_freq
         loss.backward()
-        self.optimizer.step()
-        self.scheduler.step()
-        return loss.detach()
+        if (self.iter_counter % self.update_freq) == 0:
+            self.optimizer.step()
+            self.scheduler.step()
+            self.iter_counter = 0
+            self.optimizer.zero_grad()
+        self.iter_counter += 1
+        return loss.detach() * self.update_freq
 
     def valid_step(self, batch):
         self.model.eval()
@@ -62,21 +67,15 @@ class Trainer:
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
-        output = torch.argmax(output, dim=1)
+        # output = torch.argmax(output, dim=1)
         return output
 
     def get_optimizer(self, args, model):
-        if args['OPTIM'] == 'SGD':
-            optimizer = optim.SGD(model.parameters(), lr=args['LR'], momentum=args['MOMENTUM'], weight_decay=args['WD']) 
-        elif args['OPTIM'] == 'ADAM':
-            optimizer = optim.AdamW(model.parameters(), lr=args['LR'], betas=(0.9, 0.95))
-        else:
-            print('Unsupported optimizer.')
-            exit()
+        optimizer = optim.AdamW(model.parameters(), lr=args['LR'], betas=(0.9, 0.95))
         return optimizer
 
-    def get_scheduler(self, initial_lr, max_iters):
-        scheduler = CustomPolynomialDecayLR(self.optimizer, initial_lr, max_iters=max_iters)
+    def get_scheduler(self, initial_lr, epochs, num_batches, warmup):
+        scheduler = CosineDecay(self.optimizer, initial_lr, epochs, num_batches, warmup)
         return scheduler
 
     def get_loss_criterion(self, args):

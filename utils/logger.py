@@ -109,7 +109,7 @@ class Logger:
 
 class PreTrainingLogger:
     def __init__(self, args, model=None):
-        self.best_loss, self.best_epoch = 0, 0        # this is a logger metric
+        self.best_loss, self.best_epoch = 1e10, 0        # this is a logger metric
         self.online_log = args['ONLINELOG']
         if self.online_log:
             self.wdb_log = WDBLogger(args, model, sync_tensorboard=True)
