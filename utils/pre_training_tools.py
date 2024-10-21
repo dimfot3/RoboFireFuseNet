@@ -15,10 +15,12 @@ from datasets.imagenet import ImageNet
 
 class Trainer:
     def __init__(self, args, model, len_data):
+        self.use_amp = False if args['DEVICE'] == 'cpu' else True
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
         self.scheduler = self.get_scheduler(args['LR'], args['EPOCHS'], np.ceil(len_data / args['BATCHSIZE']), args['WARMUP'])
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
@@ -32,16 +34,18 @@ class Trainer:
         self.model.train()
         images, labels, mask = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.long, device=self.device)
-        output = self.model(images)
-        output_mask = F.interpolate(
-                            output[1],
-                            size=[images.shape[-2], images.shape[-1]],
-                            mode='bilinear', align_corners=True)
-        loss = self.criterion.get_loss(output_mask, labels, mask)
+        with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=self.use_amp):
+            output = self.model(images)
+            output_mask = F.interpolate(
+                                output[1],
+                                size=[images.shape[-2], images.shape[-1]],
+                                mode='bilinear', align_corners=True)
+            loss = self.criterion.get_loss(output_mask, labels, mask)
         loss = loss.mean() / self.update_freq
-        loss.backward()
+        self.scaler.scale(loss).backward()
         if (self.iter_counter % self.update_freq) == 0:
-            self.optimizer.step()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
             self.scheduler.step()
             self.iter_counter = 0
             self.optimizer.zero_grad()
@@ -101,7 +105,8 @@ class Trainer:
             'epoch': epoch + 1,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
-            'scheduler_state_dict': self.scheduler.state_dict()
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'scaler_state_dict': self.scaler.state_dict()
         }
         torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}_{itter}.pth'))
 
@@ -110,6 +115,7 @@ class Trainer:
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
         self.start_epoch = checkpoint['epoch']
 
 def get_dataset(args):
