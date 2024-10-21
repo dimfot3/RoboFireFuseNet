@@ -20,7 +20,8 @@ class ImageNet(Dataset):
                 for fname in os.listdir(cls_folder):
                     if fname.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
                         self.image_paths.append(os.path.join(cls_folder, fname))
-        self.patch_size = 2
+        self.image_paths = self.image_paths[::2]
+        self.patch_size = 32
     def __len__(self):
         return len(self.image_paths)
 

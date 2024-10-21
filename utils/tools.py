@@ -230,3 +230,4 @@ def qualitive_eval_pretrain(inf_model, val_data, ex_path='./outputs', name='exam
         ax[1][sampleid].imshow(outputs, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))
+    plt.close(f)
