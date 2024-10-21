@@ -1,0 +1,52 @@
+# corsican params
+# general
+PROJECTNAME: 'test'
+SESSIONAME: 'test'
+DEVICE: 'cuda'
+NUM_WORKERS: 10
+ONLINELOG: False
+SEED: 200
+STOPCOUNTER: 12
+VALID_FREQ: 2
+# model
+MODEL: 'async_s'
+NUM_OUTPUTS: 2
+PRETRAINED: null
+# data
+TRAINSET: 'lists/train_flm.txt'
+VALIDSET: 'lists/train_flm.txt'
+TESTSET: 'lists/test.txt'
+ROOTDATASET: '../Datasets/FINLAND'
+MAX_FR_APART: 180
+NUM_CLASSES: 3
+CLS_NAMES: ['bg', 'smoke', 'fire']
+MODE: 'fusion'
+MULTISCALE: True
+FLIP: True
+BRIGHTNESS: True
+CONTRAST: True
+ONE_INP_AUG: True           # this is for mid fusion, after attention
+SINGLE_SOURCE_AUG: False
+IGNORE_LABEL: 255
+SCALE_FACTOR: 9
+CROP_SIZE: [272, 336]
+BASE_SIZE: 336
+#0.22256892, 0.30859346, 0.46883762 (flame+finland LW) [bg, smoke, fire]
+# 0.11, 0.89
+CLASS_WEIGHTS: [0.11, 0.14, 0.75]
+ALIGN_CORNERS: True
+# loss and optimization
+LR: 0.005647243
+BATCHSIZE: 12
+EPOCHS: 200
+OPTIM: 'SGD'
+USE_OHEM: False
+OHEMTHRES: 0.9
+OHEMKEEP: 131072
+WD: 0.0000018551
+MOMENTUM: 0.9
+NESTEROV: false
+BALANCE_WEIGHTS: [0.4, 1.0]
+T_THRESH_BDLOSS: 0.8
+BD_WEIGHT: 1.0
+SB_WEIGHTS: 1.0

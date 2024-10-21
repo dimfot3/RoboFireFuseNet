@@ -68,7 +68,7 @@ def parse_args():
     """
 
     parser = argparse.ArgumentParser(description='Setting the training parameters')
-    parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='wildfire.yaml')
+    parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='pretrain.yaml')
     parser.add_argument('--LR', type=float, help='Learning Rate')
     parser.add_argument('--BATCHSIZE', type=int, help='Batch Size')
     parser.add_argument('--WD', type=float, help='Weight decay')
@@ -200,5 +200,33 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         images = np.transpose(images, (1, 2, 0))
         images[non_bg_idxs] = outputs[non_bg_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
+    os.makedirs(ex_path, exist_ok=True)
+    plt.savefig(os.path.join(ex_path, name))
+
+def qualitive_eval_pretrain(inf_model, val_data, ex_path='./outputs', name='example.png'):
+    """
+    Perform qualitative evaluation of the segmentation model and save the results.
+
+    Parameters:
+    inf_model (torch.nn.Module): The model used for inference.
+    val_data (Dataset): The validation dataset containing images and labels.
+    ex_path (str, optional): The directory path where output images will be saved. Defaults to './outputs'.
+    name (str, optional): The filename for the saved output image. Defaults to 'example.png'.
+
+    Returns:
+    None
+    """
+    valid_loader = iter(DataLoader(val_data, batch_size=1, shuffle=True))
+    f, ax = plt.subplots(2, 5, figsize=(20, 5))
+    for sampleid in range(5):
+        batch = next(valid_loader)
+        images, labels = batch[0], batch[1]
+        outputs = inf_model(images)[0]
+        images = (np.transpose(labels[0].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) 
+                  + np.array([0.485, 0.456, 0.406])).astype('uint8')
+        outputs = (np.transpose(outputs[0].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) 
+                  + np.array([0.485, 0.456, 0.406])).astype('uint8')
+        ax[0][sampleid].imshow(images, aspect='auto')
+        ax[1][sampleid].imshow(outputs, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))

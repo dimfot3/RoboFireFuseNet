@@ -176,6 +176,15 @@ class TotalLoss:
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 
+class MaskedMSELoss():
+    def __init__(self, args):
+        return
+
+    def get_loss(self, pred, target, mask):
+        loss = ((pred - target) ** 2) * mask
+        loss = loss.reshape(loss.size(0), -1).mean(dim=1)
+        return loss
+
 if __name__ == '__main__':
     args = {'USE_OHEM': True,
             'DEVICE': 'cpu',
