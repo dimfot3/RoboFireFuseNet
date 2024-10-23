@@ -9,6 +9,10 @@ import argparse
 import yaml
 import random
 
+from skimage.measure import label as label2
+from skimage.measure import regionprops
+from scipy.ndimage import label as label1
+
 
 def set_reproducibility(seed):
     """
@@ -85,6 +89,99 @@ def parse_args():
         if key in config:
             config[key] = value
     return config
+
+
+def plot_instance_masks(gt_instance_mask, pred_instance_mask, gt_class, pred_major_class, instance_id):
+    """Helper function to plot the ground truth and predicted instance masks."""
+    
+    # Plot the images
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    axes[0].imshow(gt_instance_mask.reshape(254, 254), cmap='gray')
+    axes[0].set_title(f'Ground Truth Instance (Class {gt_class}) - ID {instance_id}')
+    axes[0].axis('off')
+
+    
+    plt.show()
+
+def process_mask(mask, k):
+    mask = mask.detach().cpu().numpy()
+    # Initialize the output mask
+    output_mask = np.zeros_like(mask)
+    
+    # Iterate over classes 1 and 2
+    for class_id in [1, 2]:
+        # Create a binary mask for the current class
+        class_mask = (mask == class_id).astype(np.uint8)
+        
+        # Label the connected components (instances)
+        labeled_mask = label2(class_mask).reshape(mask.shape)
+        # Get properties of labeled regions
+        regions = regionprops(labeled_mask)
+        
+        for region in regions:
+            if region.area >= k:
+                # Keep the instance in the output mask
+                output_mask[labeled_mask == region.label] = class_id
+                
+    return output_mask
+
+def get_confusion_matrix_instancewise(seg_gt, output, num_class, k=0.5, ignore=255):
+    """
+    Compute the confusion matrix for a segmentation task based on instance-level accuracy.
+
+    Parameters:
+    seg_gt (torch.Tensor): Ground truth segmentation map with shape (N, H, W).
+    output (torch.Tensor): Model output predictions with shape (N, num_class, H, W).
+    num_class (int): The number of classes in the segmentation task.
+    k (float): Threshold for considering an instance as True Positive (percentage overlap).
+    ignore (int, optional): Class index to ignore in the computation. Defaults to 255.
+
+    Returns:
+    numpy.ndarray: Confusion matrix of shape (num_class, num_class).
+    """
+    # Convert tensors to long and find the prediction
+    seg_gt = seg_gt.to(torch.long)
+    seg_pred = output.argmax(dim=1).to(torch.long)
+    # Create confusion matrix
+    confusion_matrix = np.zeros((num_class, num_class), dtype=np.int64)
+    img_shape = (seg_gt.shape[-2], seg_gt.shape[-1])
+    for i in range(seg_gt.shape[0]):  # Iterate over batch
+        gt_mask = seg_gt[i]
+        pred_mask = seg_pred[i]
+
+        # Ignore specified class (if necessary)
+        valid_mask = gt_mask != ignore
+        gt_mask = gt_mask[valid_mask].reshape(img_shape)
+        pred_mask = pred_mask[valid_mask].reshape(img_shape)
+        labeled_gt, num_gt_instances = label1(gt_mask)  # Get instances in GT
+        for gt_instance_id in range(0, num_gt_instances + 1):  # Skip background (ID 0)
+            # Get binary mask for this ground truth instance
+            gt_instance_mask = (labeled_gt == gt_instance_id).reshape(img_shape)
+            gt_class = np.unique(gt_mask[gt_instance_mask])  # Should be one class per instance
+            gt_class = gt_class[0]  # Since it's one instance, there should be a single class
+
+            # Get the predicted labels in the same area
+            pred_instance_mask = pred_mask[gt_instance_mask]
+
+            # Find the most common class in the predicted instance mask
+            pred_class, counts = np.unique(pred_instance_mask, return_counts=True)
+            pred_major_class = pred_class[np.argmax(counts)]
+
+            # Calculate overlap ratio for the predicted class vs ground truth
+            intersection = (pred_instance_mask == gt_class).sum()
+            union = gt_instance_mask.sum()
+
+            overlap_ratio = intersection / float(union)
+            # plot_instance_masks(gt_instance_mask, pred_instance_mask, gt_class, pred_major_class, gt_instance_id)
+
+            # Decide if it's a True Positive, False Positive, or False Negative
+            if overlap_ratio >= k:
+                confusion_matrix[gt_class, gt_class] += 1  # True Positive
+            else:
+                confusion_matrix[gt_class, pred_major_class] += 1  # False Positive or FN
+                
+    return confusion_matrix
 
 def get_confusion_matrix(seg_gt, output, num_class, ignore=255):
     """
