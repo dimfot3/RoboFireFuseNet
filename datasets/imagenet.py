@@ -77,8 +77,9 @@ class ImageNet(Dataset):
     def random_grayscale(self, image, grayscale_fraction=0.5):
         gray_image = image.mean(dim=0, keepdim=True)  # Shape [1, H, W]
         gray_image = gray_image.repeat(3, 1, 1)  # Shape [3, H, W]
+        gray_image[1:] *= 0
         if np.random.rand() < grayscale_fraction:
-            return gray_image 
+            return gray_image
         else:
             return image
     
