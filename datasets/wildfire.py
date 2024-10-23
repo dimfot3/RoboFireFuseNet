@@ -141,7 +141,7 @@ class WildFire(BaseDataset):
 
         
 if __name__ == '__main__':
-    dataset = WildFire(root='../../Datasets/',
+    dataset = WildFire(root='../Data/',
                           list_path='lists/train_flm.txt',
                           num_classes=3,
                           multi_scale=True,
@@ -157,10 +157,13 @@ if __name__ == '__main__':
                           frames_appart=210)
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
+        images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
         f, ax = plt.subplots(1, len(images))
+        print(images.shape)
         print(name)
         for i, img in enumerate(images):
             img = (img * 255).astype('int')
+            print(img.shape)
             img = np.transpose(img, (1, 2, 0))
             ax[i].imshow(img)
         plt.show()

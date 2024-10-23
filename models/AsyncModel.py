@@ -17,10 +17,12 @@ class AsyncModel(nn.Module):
         self.input_res = 256
         self.num_classes = 3
         self.tf_config = [2, 2]
+        self.device = device
         self.rgb_tf = SwinTransformer(config=self.tf_config, dim=in_planes//2, drop_path_rate=0.2, input_resolution=self.input_res, input_c=3)
         self.ir_tf = SwinTransformer(config=self.tf_config, dim=in_planes//2, drop_path_rate=0.2, input_resolution=self.input_res, input_c=1)
         self.cross_tf = CrossSwinTransformer(config=self.tf_config, dim=in_planes//2, drop_path_rate=0.2, input_resolution=self.input_res)
         self.pidnethead = PIDNetHead(m=2, n=3, num_classes=self.num_classes, planes=in_planes//2, ppm_planes=96, head_planes=128, augment=True, channels=3)
+        
     
     def find_mode(self, img):
         """
@@ -52,11 +54,11 @@ class AsyncModel(nn.Module):
         irs = img_arr[ir_idxs][:, :1]
         x_rgb, q_rgb, k_rgb, v_rgb = self.rgb_tf(rgbs)
         x_ir, q_ir, k_ir, v_ir = self.ir_tf(irs)
-        q = [torch.cat([q1, q2], dim=1)[:, rev_idxs][:, mask_old]
+        q = [torch.cat([q1, q2], dim=1)[:, rev_idxs][:, cur_idxs].repeat_interleave(N-1, 1)
              for (q1, q2) in zip(q_rgb, q_ir)]
-        k = [torch.cat([k1, k2], dim=1)[:, rev_idxs][:, cur_idxs].repeat_interleave(N-1, 1)
+        k = [torch.cat([k1, k2], dim=1)[:, rev_idxs][:, mask_old]
              for (k1, k2) in zip(k_rgb, k_ir)]
-        v = [torch.cat([v1, v2], dim=1)[:, rev_idxs][:, cur_idxs].repeat_interleave(N-1, 1)
+        v = [torch.cat([v1, v2], dim=1)[:, rev_idxs][:, mask_old]
              for (v1, v2) in zip(v_rgb, v_ir)]
         x = img_arr[cur_idxs].repeat_interleave(N-1, 0)
         out = self.cross_tf(x, q, k, v)
@@ -67,6 +69,7 @@ class AsyncModel(nn.Module):
     def save_model(self, path, epoch):
         os.makedirs(f'{path}', exist_ok=True)
         torch.save(self.state_dict(), os.path.join(path, f'Epoch{epoch}.pt'))
+
 
 if __name__ == '__main__':
     device = 'cpu'

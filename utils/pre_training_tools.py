@@ -15,7 +15,7 @@ from datasets.imagenet import ImageNet
 
 class Trainer:
     def __init__(self, args, model, len_data):
-        self.use_amp = False if args['DEVICE'] == 'cpu' else True
+        self.use_amp = False if args['DEVICE'] == 'cpu' else False
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
@@ -116,7 +116,7 @@ class Trainer:
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
-        self.start_epoch = checkpoint['epoch']
+        self.start_epoch = checkpoint['epoch'] - 1
 
 def get_dataset(args):
     transform_train = transforms.Compose([

@@ -68,7 +68,7 @@ def parse_args():
     """
 
     parser = argparse.ArgumentParser(description='Setting the training parameters')
-    parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='pretrain.yaml')
+    parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='wildfire.yaml')
     parser.add_argument('--LR', type=float, help='Learning Rate')
     parser.add_argument('--BATCHSIZE', type=int, help='Batch Size')
     parser.add_argument('--WD', type=float, help='Weight decay')
@@ -191,17 +191,25 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
     for sampleid in range(10):
         batch = next(valid_loader)
         images = batch[0]
+        label = batch[1][0].detach().cpu().numpy().astype('uint8')
         outputs = inf_model(images)
         images = (images[0][-3:].detach().cpu().numpy() * 255).astype('uint8')
         images = images if images[:2].sum() > 0.2 else np.resize(images[0], (1, images.shape[1], images.shape[2]))
         outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
         non_bg_idxs = outputs!=0
+        non_gt_idxs = label!=0
         outputs = val_data.label2color(outputs)
+        gt = (val_data.label2color(label)[:, :, ::-1]).astype('uint8')
+        gt[label == 2, 1:] = 0
+        gt[label == 1, :2] = 0
+        gt[label == 1, 2] = 255
         images = np.transpose(images, (1, 2, 0))
-        images[non_bg_idxs] = outputs[non_bg_idxs]
+        images[non_bg_idxs] = 0.19 * images[non_bg_idxs] + 0.78 * outputs[non_bg_idxs]
+        images[non_gt_idxs] = 0.29 * images[non_gt_idxs] + 0.68 * gt[non_gt_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))
+    plt.close(f)
 
 def qualitive_eval_pretrain(inf_model, val_data, ex_path='./outputs', name='example.png'):
     """

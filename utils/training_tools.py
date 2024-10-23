@@ -4,18 +4,21 @@ import torch.nn.functional as F
 import os
 from .tools import get_confusion_matrix
 from .total_loss import TotalLoss
-from .scheduler import CustomPolynomialDecayLR
+from .scheduler import CosineDecay
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
 from models.AsyncModel import AsyncModel
 
+
 class Trainer:
     def __init__(self, args, model, len_data):
+        self.use_amp = False if args['DEVICE'] == 'cpu' else True
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
-        self.scheduler = self.get_scheduler(args['LR'], (np.ceil(len_data / args['BATCHSIZE'])) * args['EPOCHS'])
+        self.scheduler = self.get_scheduler(args['LR'], args['EPOCHS'], (np.ceil(len_data / args['BATCHSIZE'])), args['WARMUP'])
+        self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
@@ -25,16 +28,18 @@ class Trainer:
         self.optimizer.zero_grad()
         images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
-        output = self.model(images)
-        output_mask = F.interpolate(
-                            output[1],
-                            size=[images.shape[-2], images.shape[-1]],
-                            mode='bilinear', align_corners=True)
+        with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=self.use_amp):
+            output = self.model(images)
+            output_mask = F.interpolate(
+                                output[1],
+                                size=[images.shape[-2], images.shape[-1]],
+                                mode='bilinear', align_corners=True)
+            losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
         loss = losses.mean()
-        loss.backward()
-        self.optimizer.step()
+        self.scaler.scale(loss).backward()
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
         self.scheduler.step()
         return loss.detach(), conf_mat
 
@@ -73,8 +78,8 @@ class Trainer:
             exit()
         return optimizer
 
-    def get_scheduler(self, initial_lr, max_iters):
-        scheduler = CustomPolynomialDecayLR(self.optimizer, initial_lr, max_iters=max_iters)
+    def get_scheduler(self, initial_lr, epochs, num_batches, warmup):
+        scheduler = CosineDecay(self.optimizer, initial_lr, epochs, num_batches, warmup)
         return scheduler
 
     def get_loss_criterion(self, args):
@@ -90,6 +95,25 @@ class Trainer:
         if self.counter >= self.args['STOPCOUNTER']:
             return True
         return False
+    
+    def save_checkpoint(self, path, epoch, itter=0):
+        os.makedirs(f'{path}', exist_ok=True)
+        checkpoint = {
+            'epoch': epoch + 1,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'scheduler_state_dict': self.scheduler.state_dict(),
+            'scaler_state_dict': self.scaler.state_dict()
+        }
+        torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}_{itter}.pth'))
+
+    def load_checkpoint(self, path):
+        checkpoint = torch.load(path)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+        self.start_epoch = checkpoint['epoch'] - 1
 
 def get_dataset(args):
     train_dataset = WildFire(root=args['ROOTDATASET'],
@@ -134,6 +158,6 @@ def get_model(args):
     elif 'async_m' == args['MODEL']:
         model = AsyncModel(128)
     if args['PRETRAINED'] is not None:
-        model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu'))
+        model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu')['model_state_dict'])
     model.to(device=args['DEVICE'])
     return model

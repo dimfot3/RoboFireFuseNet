@@ -102,13 +102,13 @@ class BondaryLoss(nn.Module):
         target_t = target.view(1, -1)
         pos_index = (target_t == 1)
         neg_index = (target_t == 0)
-        weight = torch.zeros_like(log_p)
+        weight = torch.zeros_like(log_p).float()
         pos_num = pos_index.sum()
         neg_num = neg_index.sum()
-        sum_num = pos_num + neg_num
-        weight[pos_index] = neg_num * 1.0 / sum_num
-        weight[neg_index] = pos_num * 1.0 / sum_num
-        loss = F.binary_cross_entropy_with_logits(log_p, target_t, weight, reduction='mean')
+        sum_num = pos_num.float() + neg_num
+        weight[pos_index] = neg_num.float() * 1.0 / sum_num
+        weight[neg_index] = pos_num.float() * 1.0 / sum_num
+        loss = F.binary_cross_entropy_with_logits(log_p, target_t, weight.float(), reduction='mean')
         return loss
 
     def forward(self, bd_pre, bd_gt):
@@ -171,8 +171,8 @@ class TotalLoss:
         loss_b = self.bd_criterion(outputs[-1], bd_gt)      # the boundary loss l1
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
-        loss_sb = self.sem_criterion(outputs[-2], bd_label)     # the boundary aware semantic loss (integral head is used)
-        loss = loss_s + loss_b + loss_sb
+        loss_sb = self.sem_criterion(outputs[-2], bd_label)
+        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0)
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 
