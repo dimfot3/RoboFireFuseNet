@@ -78,7 +78,6 @@ class WildFire(BaseDataset):
         return color_map.astype(np.uint8)
     
     def find_closest_images(self, target_id, k):
-
         bounds = [[1, 8600], [8601, 13700], [13700, 19899], [19900, 25695], \
                   [25696, 27514], [27515, 31509], [31510, 33929], [33930, 37189],   \
                   [37189, 40108], [40109, 41100], [41101, 44699], [44700, 46259],   \

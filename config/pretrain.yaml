@@ -17,9 +17,9 @@ PRETRAINED: null
 CHECKPOINT: null
 # data
 TRAINSET: 'lists/train_flm.txt'
-VALIDSET: 'lists/train_flm.txt'
-TESTSET: 'lists/test.txt'
-ROOTDATASET: '/media/FastData/nmilitsis/CPP/data/ImageNet/train'
+VALIDSET: 'lists/test_flm.txt'
+TESTSET: 'lists/test_flm.txt'
+ROOTDATASET: '../Datasets'
 MAX_FR_APART: 180
 NUM_CLASSES: 3
 CLS_NAMES: ['bg', 'smoke', 'fire']

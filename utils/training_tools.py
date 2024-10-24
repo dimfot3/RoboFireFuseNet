@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import os
 from .tools import get_confusion_matrix, get_confusion_matrix_instancewise
 from .total_loss import TotalLoss
-from .scheduler import CosineDecay
+from .scheduler import CosineDecay, PolynomialDecayLR
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
@@ -17,6 +17,7 @@ import torchvision.transforms.functional as VF
 
 class Trainer:
     def __init__(self, args, model, len_data):
+        self.model_name = args['MODEL']
         self.use_amp = False if args['DEVICE'] == 'cpu' else True
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
@@ -101,7 +102,10 @@ class Trainer:
         return optimizer
 
     def get_scheduler(self, initial_lr, epochs, num_batches, warmup):
-        scheduler = CosineDecay(self.optimizer, initial_lr, epochs, num_batches, warmup)
+        if self.model_name[:5] == 'async':
+            scheduler = CosineDecay(self.optimizer, initial_lr, epochs, num_batches, warmup)
+        elif self.model_name[:6] == 'pidnet':
+            scheduler = PolynomialDecayLR(self.optimizer, initial_lr, epochs * num_batches, 0.9, 10)
         return scheduler
 
     def get_loss_criterion(self, args):
@@ -118,7 +122,7 @@ class Trainer:
             return True
         return False
     
-    def save_checkpoint(self, path, epoch, itter=0):
+    def save_checkpoint(self, path, epoch):
         os.makedirs(f'{path}', exist_ok=True)
         checkpoint = {
             'epoch': epoch + 1,
@@ -127,7 +131,7 @@ class Trainer:
             'scheduler_state_dict': self.scheduler.state_dict(),
             'scaler_state_dict': self.scaler.state_dict()
         }
-        torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}_{itter}.pth'))
+        torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}.pth'))
 
     def load_checkpoint(self, path):
         checkpoint = torch.load(path, map_location=self.device)
@@ -186,11 +190,11 @@ def get_dataset(args, test=False):
 
 def get_model(args):
     if 'pidnet_s' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=12)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' == 'rgb') else 4)
     elif 'pidnet_m' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=12)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' == 'rgb') else 4)
     elif 'pidnet_l' == args['MODEL']:
-        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=12)
+        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if ('MODE' == 'rgb') else 4)
     elif 'async_s' == args['MODEL']:
         model = AsyncModel(64)
     elif 'async_m' == args['MODEL']:

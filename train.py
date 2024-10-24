@@ -25,7 +25,7 @@ def train(model, train_data, val_data, args, logger):
             val_metrics = valid(trainer, val_data, epoch, args)
             logger.print_metrics(val_metrics, args['CLS_NAMES'], args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
             metrics = {**metrics, **val_metrics}
-            model.save_model(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME']), epoch)
+            trainer.save_checkpoint(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME']), epoch)
             if trainer.stop_sign(metrics): break
         logger.log(metrics, epoch, trainer.scheduler)
     print(f"Training Finished! Best Epoch {logger.best_epoch}: MIOU {logger.best_miou}")
