@@ -8,6 +8,7 @@ from base_dataset import BaseDataset
 import re
 import pandas as pd
 
+
 class WildFire(BaseDataset):
     def __init__(self, 
                  root, 
@@ -26,7 +27,8 @@ class WildFire(BaseDataset):
                  bd_dilate_size=4, 
                  n_stack=5,
                  frames_appart=5,
-                 seed=200):
+                 seed=200,
+                 load_cache=True):
 
         self.mean = mean
         self.std = std
@@ -36,7 +38,7 @@ class WildFire(BaseDataset):
         self.root = root
         self.list_path = list_path
         self.num_classes = num_classes
-
+        self.load_cache = load_cache
         self.multi_scale = multi_scale
         self.flip = flip
         self.brightness = brightness
@@ -84,7 +86,7 @@ class WildFire(BaseDataset):
     
     def read_files(self):
         cache_file_path = os.path.join(self.root, '.cache_df.csv')
-        if os.path.exists(cache_file_path):
+        if os.path.exists(cache_file_path) and self.load_cache:
             print("Loading from cache...")
             return pd.read_csv(cache_file_path)
         
@@ -182,9 +184,9 @@ class WildFire(BaseDataset):
                 img = np.asarray(img)
                 img = img.reshape(*(img.shape[:2]), -1)
                 loaded_images.append(img)
-        with Image.open(label).convert('L') as label_img:
+        with Image.open(label) as label_img:
             label = np.asarray(label_img)
-            label = self.label2color(label)
+            label = self.label2color(label) if len(label.shape) == 2 else label
         images, label, edge = self.gen_sample(loaded_images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
                                 edge_size=self.bd_dilate_size, brightness=self.brightness, contrast=self.contrast)
@@ -224,7 +226,7 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
-                          list_path='lists/val_mvseg.txt',
+                          list_path='lists/train_mvseg.txt',
                           num_classes=3,
                           multi_scale=True,
                           flip=True,
@@ -236,7 +238,8 @@ if __name__ == '__main__':
                           base_size=336,
                           bd_dilate_size=4,
                           n_stack=3,
-                          frames_appart=10)
+                          frames_appart=10,
+                          load_cache=True)
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
         images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
