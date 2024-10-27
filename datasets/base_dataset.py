@@ -33,7 +33,7 @@ class BaseDataset(data.Dataset):
         self.files = []
 
     def __len__(self):
-        return len(self.files)
+        return len(self.files[self.files['labeled'] == True])
 
     def input_transform(self, images):
         """
@@ -80,11 +80,12 @@ class BaseDataset(data.Dataset):
         for i, image in enumerate(images):
             images[i] = self.pad_image(image, h, w, self.crop_size,
                                 (0.0, 0.0, 0.0))
+        
         label = self.pad_image(label, h, w, self.crop_size,
-                               (self.ignore_label,))
+                               (255.0, 255.0, 255.0))
         edge = self.pad_image(edge, h, w, self.crop_size,
                                (0.0,))
-        new_h, new_w = label.shape
+        new_h, new_w, _ = label.shape
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
         for i, image in enumerate(images):
@@ -107,15 +108,15 @@ class BaseDataset(data.Dataset):
             new_w = long_size
             new_h = int(h * long_size / w + 0.5)
         for i, image in enumerate(images):
-            n_ch = images[i].shape[-1]
-            images[i] = np.resize(cv2.resize(image, (new_w, new_h),
-                            interpolation=cv2.INTER_LINEAR), (new_w, new_h, n_ch))
+            nc = images[i].shape[-1]
+            images[i] = cv2.resize(image, (new_w, new_h),
+                            interpolation=cv2.INTER_LINEAR).reshape(new_h, new_w, nc)
         if label is not None:
             label = cv2.resize(label, (new_w, new_h),
                             interpolation=cv2.INTER_NEAREST)
             if edge is not None:
                 edge = cv2.resize(edge, (new_w, new_h),
-                                interpolation=cv2.INTER_NEAREST)
+                                interpolation=cv2.INTER_NEAREST).reshape(new_h, new_w)
         else:
             return images
         if rand_crop:
@@ -153,7 +154,7 @@ class BaseDataset(data.Dataset):
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             images, label, edge = self.multi_scale_aug(images, label, edge,
-                                                rand_scale=rand_scale)            
+                                                rand_scale=rand_scale)        
         if brightness and (np.random.random() > 0.85):
             images = self.change_brightness(images)
         if contrast and (np.random.random() > 0.85):
@@ -168,7 +169,6 @@ class BaseDataset(data.Dataset):
             edge = edge[:, ::flip]
             for i, image in enumerate(images):
                 images[i] = image[:, :, ::flip]
-
         return images, label, edge
 
 

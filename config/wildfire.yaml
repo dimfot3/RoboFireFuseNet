@@ -30,7 +30,7 @@ CONTRAST: False
 ONE_INP_AUG: False           # this is for mid fusion, after attention
 SINGLE_SOURCE_AUG: False
 IGNORE_LABEL: 255
-SCALE_FACTOR: 9
+SCALE_FACTOR: 10
 CROP_SIZE: [272, 336]
 BASE_SIZE: 336
 #0.22256892, 0.30859346, 0.46883762 (flame+finland LW) [bg, smoke, fire]
