@@ -21,7 +21,7 @@ class PIDNet(nn.Module):
     def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3):
         super(PIDNet, self).__init__()
         self.augment = augment
-        
+        self.channels = channels
         # I Branch
         self.conv1 =  nn.Sequential(
                           nn.Conv2d(channels,planes,kernel_size=3, stride=2, padding=1),
@@ -143,7 +143,28 @@ class PIDNet(nn.Module):
         msg = 'Loaded {} parameters!'.format(len(pretrained_state))
         self.load_state_dict(model_dict, strict = False)
 
+    def find_mode(self, img):
+        """
+        returns 0 if rgb and 1 if ir
+        """
+        if(math.isclose(img[1:].sum(), 0, abs_tol=1e-9)):
+            return 1
+        return 0
+
+    def make_input(self, x):
+        B, N, H, W = x.size()
+        x_new = torch.zeros((B, self.channels, H, W))
+        for b in range(B):
+            for n in range(N // 3):
+                img = x[b, n*3:(n+1)*3]
+                if self.find_mode(img) == 1:
+                    x_new[b, -1] = img[0]
+                else:
+                    x_new[b, :3] = img
+        return x_new
+
     def forward(self, x):
+        x = self.make_input(x)
         x = self.conv1(x)
         x = self.layer1(x)
         x = self.relu(self.layer2(self.relu(x)))
@@ -188,7 +209,7 @@ class PIDNet(nn.Module):
             x_extra_d = self.seghead_d(temp_d)
             return [x_extra_p, x_, x_extra_d]
         else:
-            return x_      
+            return x_
     
     def save_model(self, path, epoch):
         os.makedirs(f'{path}', exist_ok=True)
@@ -198,12 +219,11 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = model = PIDNet(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=3)
+    model = model = PIDNet(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4)
     model.eval()
     model.to(device)
     iterations = None
-    
-    input = torch.randn(1, 3, 272, 336).to(device)
+    input = torch.randn(1, 6, 272, 336).to(device)
     summary(model, input)
     
     

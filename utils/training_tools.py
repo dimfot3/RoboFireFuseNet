@@ -156,7 +156,8 @@ def get_dataset(args, test=False):
                           bd_dilate_size=4,
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
-                          mode=args['MODE']) 
+                          mode=args['MODE'])
+    
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
                           num_classes=args['NUM_CLASSES'],
