@@ -156,7 +156,6 @@ class WildFire(BaseDataset):
         images.append(os.path.join(folder, target_name))
         names = selected_candidates['name'].tolist()
         names.append(target_name)
-        # print(names)
         return images, names
     
     def get_async_multi_modal_inputs(self, list_of_imgs):
@@ -189,7 +188,7 @@ class WildFire(BaseDataset):
                 loaded_images.append(img)
         with Image.open(label) as label_img:
             label = np.asarray(label_img)
-            label = self.label2color(label) if len(label.shape) == 2 else label
+            label = label if len(label.shape) == 2 else self.color2label(label)
         images, label, edge = self.gen_sample(loaded_images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
                                 edge_size=self.bd_dilate_size, brightness=self.brightness, contrast=self.contrast)
@@ -197,7 +196,7 @@ class WildFire(BaseDataset):
             if img.shape[0] == 1:
                 images[i] = np.append(images[i], np.zeros((2, images[i].shape[1], images[i].shape[2])), axis=0)
         images = np.concatenate(images, axis=0)
-        return images, label, edge, names
+        return images.copy(), label.copy(), edge.copy(), [names]
 
     def single_scale_inference(self, config, model, image):
         pred = self.inference(config, model, image)
@@ -254,7 +253,7 @@ if __name__ == '__main__':
             if img[:, :, 1:].sum() == 0:
                 img = img[:, :, 0]
             ax[i].imshow(img)
-        label = label.astype('int')
+        label = dataset.label2color(label).astype('int')
         edge = edge.astype('int')
         ax[-2].imshow(label)
         ax[-1].imshow(edge)

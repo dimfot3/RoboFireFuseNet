@@ -1,7 +1,7 @@
 # corsican params
 # general
-PROJECTNAME: 'Async'
-SESSIONAME: 'Trainv3'
+PROJECTNAME: 'Test'
+SESSIONAME: 'Test'
 DEVICE: 'cpu'
 NUM_WORKERS: 10
 ONLINELOG: False
@@ -15,13 +15,13 @@ NUM_OUTPUTS: 2
 PRETRAINED: null
 CHECKPOINT: null
 # data
-TRAINSET: 'lists/train_flm.txt'
-VALIDSET: 'lists/test_flm.txt'
-TESTSET: 'lists/test_flm.txt'
+TRAINSET: 'lists/mvseg_train.txt'
+VALIDSET: 'lists/mvseg_val.txt'
+TESTSET: 'lists/mvseg_test.txt'
 ROOTDATASET: '../Datasets/'
 N_FRAMES: 2
-MAX_FR_APART: 6
-NUM_CLASSES: 3
+MAX_FR_APART: 10
+NUM_CLASSES: 26
 CLS_NAMES: ['bg', 'smoke', 'fire']
 MODE: 'fusion'
 MULTISCALE: True
@@ -36,7 +36,9 @@ CROP_SIZE: [272, 336]
 BASE_SIZE: 336
 #0.22256892, 0.30859346, 0.46883762 (flame+finland LW) [bg, smoke, fire]
 # 0.11, 0.14, 0.75
-CLASS_WEIGHTS: [0.21, 0.34, 0.45]
+# 
+CLASS_WEIGHTS: [0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.03846154, 0.0384615]
+#[0.21, 0.34, 0.45]
 ALIGN_CORNERS: True
 # loss and optimization
 LR: 0.0001

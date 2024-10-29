@@ -85,7 +85,7 @@ class BaseDataset(data.Dataset):
                                (255.0, 255.0, 255.0))
         edge = self.pad_image(edge, h, w, self.crop_size,
                                (0.0,))
-        new_h, new_w, _ = label.shape
+        new_h, new_w = label.shape
         x = random.randint(0, new_w - self.crop_size[1])
         y = random.randint(0, new_h - self.crop_size[0])
         for i, image in enumerate(images):
