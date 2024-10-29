@@ -92,7 +92,7 @@ class WildFire(BaseDataset):
         
         labeled_files = []
         for item in self.img_list:
-            folder, item = item.split('/')[0], item.split('/')[1]
+            folder, item = '/'.join(item.split('/')[:-1]), item.split('/')[-1]
             name = os.path.splitext(os.path.basename(item))[0]
             id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)])', name)
             labeled_files.append({
@@ -104,7 +104,7 @@ class WildFire(BaseDataset):
         df = pd.DataFrame(labeled_files)
         unique_folders = df['folder'].unique()
         for folder in unique_folders:
-            folder_path = os.path.join(self.root, folder, 'images')
+            folder_path = os.path.join(self.root, folder)
             all_files = [file for file in os.listdir(folder_path) if (file.find('_rgb') != -1)]
             for file_name in all_files:
                 file_name = file_name.replace('_rgb_', '_XXX_').replace('_rgb', '_XXX')
@@ -149,9 +149,13 @@ class WildFire(BaseDataset):
     def pick_target_with_candidates(self, candidates, target_row):
         target_name = target_row['name']
         folder = target_row['folder']
-        selected_candidates = candidates.sample(n=min(self.n_stack - 1, len(candidates)), random_state=self.seed)
-        images = (folder + '/images/' + selected_candidates['name']).tolist()
-        images.append(folder + '/images/' + target_name)
+        numbers = np.sort(candidates['id'].to_numpy())
+        interval = len(numbers) / (self.n_stack - 2) if self.n_stack > 2 else 0
+        indices = [round(i * interval) for i in range(self.n_stack - 1)]
+        selected_numbers = [numbers[i] for i in indices if i < len(numbers)]
+        selected_candidates = candidates[candidates['id'].isin(selected_numbers)]
+        images = [os.path.join(folder, name) for name in selected_candidates['name'].tolist()]
+        images.append(os.path.join(folder, target_name))
         names = selected_candidates['name'].tolist()
         names.append(target_name)
         return images, names
@@ -226,7 +230,7 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
-                          list_path='lists/train_mvseg.txt',
+                          list_path='lists/mvseg_train.txt',
                           num_classes=3,
                           multi_scale=True,
                           flip=True,
@@ -237,7 +241,7 @@ if __name__ == '__main__':
                           crop_size=[272, 336],
                           base_size=336,
                           bd_dilate_size=4,
-                          n_stack=3,
+                          n_stack=2,
                           frames_appart=10,
                           load_cache=True)
     for i in np.random.choice(len(dataset), 3):
