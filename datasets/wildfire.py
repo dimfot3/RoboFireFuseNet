@@ -46,8 +46,7 @@ class WildFire(BaseDataset):
         self.img_list = [line[:-1] for line in open(os.path.join(root, list_path))]
         self.files = self.read_files()
         self.ignore_label = ignore_label
-        # self.color_list = [[0, 0, 0], [125, 125, 125],[255, 255, 255]]
-        self.color_list = [
+        self.color_list = [[0, 0, 0], [125, 125, 125],[255, 255, 255]] if num_classes == 3 else [
         (0, 0, 0),          # 0:    background(unlabeled)
         (0, 0, 142),        # 1:    Car
         (0, 60, 100),       # 2:    Bus
@@ -76,7 +75,6 @@ class WildFire(BaseDataset):
         (110, 80, 100),      # 25:   Ground
         (255, 255, 255)      # 26:   ignore
         ]
-
         self.class_weights = None
         self.bd_dilate_size = bd_dilate_size
         self.n_stack = n_stack
@@ -230,7 +228,7 @@ class WildFire(BaseDataset):
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
                           list_path='lists/mvseg_test.txt',
-                          num_classes=3,
+                          num_classes=25,
                           multi_scale=True,
                           flip=True,
                           brightness=True,
