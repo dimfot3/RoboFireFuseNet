@@ -85,7 +85,7 @@ class WildFire(BaseDataset):
 
     
     def read_files(self):
-        cache_file_path = os.path.join(self.root, '.cache_df.csv')
+        cache_file_path = os.path.join(self.root, self.list_path + '.cache_df.csv')
         if os.path.exists(cache_file_path) and self.load_cache:
             print("Loading from cache...")
             return pd.read_csv(cache_file_path)
@@ -121,7 +121,7 @@ class WildFire(BaseDataset):
                         "labeled": False  # Mark as not labeled
                     })
         df = pd.DataFrame(labeled_files)
-        df.to_csv(os.path.join(self.root, '.cache_df.csv'), index=False)
+        df.to_csv(os.path.join(self.root, self.list_path + '.cache_df.csv'), index=False)
         print("DataFrame saved to cache.")
         return df
 
@@ -138,7 +138,7 @@ class WildFire(BaseDataset):
         return color_map.astype(np.uint8)
     
     def filter_by_prefix_and_id_range(self, df, row_index, k):
-        target_row = df.iloc[row_index]
+        target_row = df[df['labeled'] == True].iloc[row_index]
         target_prefix = target_row['prefix']
         target_id = int(target_row['id'])
         same_prefix_df = df[df['prefix'] == target_prefix]
@@ -149,15 +149,14 @@ class WildFire(BaseDataset):
     def pick_target_with_candidates(self, candidates, target_row):
         target_name = target_row['name']
         folder = target_row['folder']
-        numbers = np.sort(candidates['id'].to_numpy())
-        interval = len(numbers) / (self.n_stack - 2) if self.n_stack > 2 else 0
-        indices = [round(i * interval) for i in range(self.n_stack - 1)]
-        selected_numbers = [numbers[i] for i in indices if i < len(numbers)]
-        selected_candidates = candidates[candidates['id'].isin(selected_numbers)]
+        candidates = pd.concat([candidates, target_row.to_frame().T], axis=0, ignore_index=True)
+        idxs = np.argsort(candidates['id'].to_numpy() - target_row['id'])[::-1]
+        selected_candidates = candidates.iloc[idxs[:(self.n_stack - 1)]]
         images = [os.path.join(folder, name) for name in selected_candidates['name'].tolist()]
         images.append(os.path.join(folder, target_name))
         names = selected_candidates['name'].tolist()
         names.append(target_name)
+        # print(names)
         return images, names
     
     def get_async_multi_modal_inputs(self, list_of_imgs):
@@ -230,7 +229,7 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
-                          list_path='lists/mvseg_train.txt',
+                          list_path='lists/mvseg_test.txt',
                           num_classes=3,
                           multi_scale=True,
                           flip=True,
@@ -242,7 +241,7 @@ if __name__ == '__main__':
                           base_size=336,
                           bd_dilate_size=4,
                           n_stack=2,
-                          frames_appart=10,
+                          frames_appart=0,
                           load_cache=True)
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
@@ -259,7 +258,4 @@ if __name__ == '__main__':
         ax[-2].imshow(label)
         ax[-1].imshow(edge)
         plt.show()
-        
-        
-
         

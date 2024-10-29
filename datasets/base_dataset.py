@@ -33,7 +33,7 @@ class BaseDataset(data.Dataset):
         self.files = []
 
     def __len__(self):
-        return len(self.files[self.files['labeled'] == True])
+        return len(self.files[self.files['labeled'] == True]['name'].to_numpy())
 
     def input_transform(self, images):
         """
