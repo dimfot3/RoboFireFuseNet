@@ -154,8 +154,9 @@ def get_dataset(args, test=False):
                           crop_size=args['CROP_SIZE'],
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
-                          n_stack=3,
-                          frames_appart=args['MAX_FR_APART']) 
+                          n_stack=args['N_FRAMES'],
+                          frames_appart=args['MAX_FR_APART'],
+                          mode=args['MODE']) 
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
                           num_classes=args['NUM_CLASSES'],
@@ -168,8 +169,9 @@ def get_dataset(args, test=False):
                           crop_size=args['CROP_SIZE'],
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
-                          n_stack=3,
-                          frames_appart=args['MAX_FR_APART'])
+                          n_stack=args['N_FRAMES'],
+                          frames_appart=args['MAX_FR_APART'],
+                          mode=args['MODE'])
     if test:
         test_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['TESTSET'],
@@ -183,18 +185,19 @@ def get_dataset(args, test=False):
                           crop_size=args['CROP_SIZE'],
                           base_size=args['BASE_SIZE'],
                           bd_dilate_size=4,
-                          n_stack=3,
-                          frames_appart=args['MAX_FR_APART'])
+                          n_stack=args['N_FRAMES'],
+                          frames_appart=args['MAX_FR_APART'],
+                          mode=args['MODE'])
         return train_dataset, val_dataset, test_dataset
     return train_dataset, val_dataset
 
 def get_model(args):
     if 'pidnet_s' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' == 'rgb') else 4)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' != 'rgb') else 4)
     elif 'pidnet_m' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' == 'rgb') else 4)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' != 'rgb') else 4)
     elif 'pidnet_l' == args['MODEL']:
-        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if ('MODE' == 'rgb') else 4)
+        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if ('MODE' != 'rgb') else 4)
     elif 'async_s' == args['MODEL']:
         model = AsyncModel(64)
     elif 'async_m' == args['MODEL']:

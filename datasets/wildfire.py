@@ -28,7 +28,8 @@ class WildFire(BaseDataset):
                  n_stack=5,
                  frames_appart=5,
                  seed=200,
-                 load_cache=True):
+                 load_cache=True,
+                 mode='fusion'):
 
         self.mean = mean
         self.std = std
@@ -39,6 +40,7 @@ class WildFire(BaseDataset):
         self.list_path = list_path
         self.num_classes = num_classes
         self.load_cache = load_cache
+        self.mode = mode
         self.multi_scale = multi_scale
         self.flip = flip
         self.brightness = brightness
@@ -159,7 +161,7 @@ class WildFire(BaseDataset):
     
     def get_async_multi_modal_inputs(self, list_of_imgs):
         modal_file_paths = []
-        start_with = np.random.choice(['rgb', 'ir'])
+        start_with = np.random.choice(['rgb', 'ir']) if self.mode == 'fusion' else self.mode
         for i in range(len(list_of_imgs)):
             replacement = start_with if i % 2 == 0 else 'ir' if start_with == 'rgb' else 'rgb'
             modal_file_paths.append(os.path.join(self.root, list_of_imgs[i].replace('XXX', replacement)))
@@ -238,9 +240,10 @@ if __name__ == '__main__':
                           crop_size=[272, 336],
                           base_size=336,
                           bd_dilate_size=4,
-                          n_stack=2,
+                          n_stack=1,
                           frames_appart=0,
-                          load_cache=True)
+                          load_cache=True,
+                          mode='fusion')
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
         images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
