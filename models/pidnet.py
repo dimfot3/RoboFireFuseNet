@@ -140,7 +140,7 @@ class PIDNet(nn.Module):
         model_dict = self.state_dict()
         pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
         model_dict.update(pretrained_state)
-        msg = 'Loaded {} parameters!'.format(len(pretrained_state))
+        msg = 'PIDnet: Loaded {} parameters!'.format(len(pretrained_state))
         self.load_state_dict(model_dict, strict = False)
         print(msg)
 

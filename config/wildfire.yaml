@@ -13,14 +13,14 @@ WARMUP: 5
 MODEL: 'pidnet_s'
 NUM_OUTPUTS: 2
 PRETRAINED: 'weights/PIDNet_S_ImageNet.pth.tar'
-CHECKPOINT: 'checkpoint_epoch_10.pth'
+CHECKPOINT: 'checkpoint_epoch_0.pth'
 # data
 TRAINSET: 'lists/mvseg_train.txt'
 VALIDSET: 'lists/mvseg_val.txt'
 TESTSET: 'lists/mvseg_test.txt'
 ROOTDATASET: '../Datasets/'
 N_FRAMES: 2
-MAX_FR_APART: 10
+MAX_FR_APART: 0
 NUM_CLASSES: 26
 CLS_NAMES: ['background', 'Car', 'Bus', 'Motorcycle', 'Bicycle', 'Pedestrian', 'Motorcyclist', 'Bicyclist', 'Cart', 'Bench', 'Umbrella', 'Box', 'Pole', 'Street_lamp', 'Traffic_light', 'Traffic_sign', 'Car_stop', 'Color_cone', 'Sky', 'Road', 'Sidewalk', 'Curb', 'Vegetation', 'Terrain', 'Building', 'Ground']
 #['bg', 'smoke', 'fire']
@@ -35,9 +35,7 @@ IGNORE_LABEL: 255
 SCALE_FACTOR: 10
 CROP_SIZE: [272, 336]
 BASE_SIZE: 336
-#0.22256892, 0.30859346, 0.46883762 (flame+finland LW) [bg, smoke, fire]
 # 0.11, 0.14, 0.75
-# 
 CLASS_WEIGHTS: [0.08500684, 0.06720411, 0.01101274, 0.01511553, 0.01312412, 0.05520766, 0.0060942,  0.00487056, 0.00750978, 0.00095972, 0.00398282, 0.02955925, 0.07257852, 0.06084599, 0.00914129, 0.03644521, 0.02622424, 0.00638211, 0.05866264, 0.06574054, 0.03560546, 0.06574054, 0.08186377, 0.06854771, 0.06955541, 0.04301927]
 #[0.21, 0.34, 0.45]
 ALIGN_CORNERS: True

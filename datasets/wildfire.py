@@ -87,7 +87,6 @@ class WildFire(BaseDataset):
     def read_files(self):
         cache_file_path = os.path.join(self.root, self.list_path + '.cache_df.csv')
         if os.path.exists(cache_file_path) and self.load_cache:
-            print("Loading from cache...")
             return pd.read_csv(cache_file_path)
         
         labeled_files = []

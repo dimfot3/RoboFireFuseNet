@@ -35,7 +35,6 @@ def main(train_args, sweep_args):
     study = optuna.create_study(f"sqlite:///outputs/studies/{train_args['PROJECTNAME']}.db", direction=direction, study_name=f'{train_args["SESSIONAME"]}', load_if_exists=True)
     study.optimize(lambda trial: objective(trial, train_args, sweep_args, train_dataset, val_dataset), n_trials=100)
 
-
 if __name__ == '__main__':
     train_args = parse_args()
     # set_reproducibility(train_args['SEED'])

@@ -27,7 +27,7 @@ class Trainer:
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
-        self.cur_epoch = 0
+        self.start_epoch = 0
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
 
@@ -106,7 +106,7 @@ class Trainer:
         if sched_name == 'COS':
             scheduler = CosineDecay(self.optimizer, initial_lr, epochs, num_batches, warmup)
         elif sched_name == 'POLY':
-            scheduler = PolynomialDecayLR(self.optimizer, initial_lr, epochs * num_batches, 0.9, 10)
+            scheduler = PolynomialDecayLR(self.optimizer, initial_lr, epochs * num_batches, num_batches, 0.9, 10, warmup_epochs=warmup)
         return scheduler
 
     def get_loss_criterion(self, args):
@@ -141,6 +141,7 @@ class Trainer:
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
         self.start_epoch = checkpoint['epoch'] - 1
+        print('Checkpoint loaded!')
 
 def get_dataset(args, test=False):
     train_dataset = WildFire(root=args['ROOTDATASET'],
