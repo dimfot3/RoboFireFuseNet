@@ -27,7 +27,9 @@ class Trainer:
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
+        self.stop_counter = args['STOPCOUNTER']
         self.start_epoch = 0
+        self.best_metric = 0
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
 
@@ -114,12 +116,11 @@ class Trainer:
         return loss
 
     def stop_sign(self, metrics):
-        return False
-        if metrics['val avg_f1'] > self.best_metric:
-            self.best_metric, self.counter = metrics['val avg_f1'], 0
+        if metrics['val miou'] > self.best_metric:
+            self.best_metric, self.counter = metrics['val miou'], 0
         else:
             self.counter += 1
-        if self.counter >= self.args['STOPCOUNTER']:
+        if self.counter >= self.stop_counter:
             return True
         return False
     
@@ -130,7 +131,8 @@ class Trainer:
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': self.optimizer.state_dict(),
             'scheduler_state_dict': self.scheduler.state_dict(),
-            'scaler_state_dict': self.scaler.state_dict()
+            'scaler_state_dict': self.scaler.state_dict(),
+            'best_metric': self.best_metric
         }
         torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}.pth'))
 
@@ -141,6 +143,7 @@ class Trainer:
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
         self.start_epoch = checkpoint['epoch'] - 1
+        self.best_metric = checkpoint['best_metric']
         print('Checkpoint loaded!')
 
 def get_dataset(args, test=False):

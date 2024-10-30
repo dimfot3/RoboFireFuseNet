@@ -6,14 +6,14 @@ DEVICE: 'cpu'
 NUM_WORKERS: 10
 ONLINELOG: False
 SEED: 200
-STOPCOUNTER: 12
+STOPCOUNTER: 2
 VALID_FREQ: 2
 WARMUP: 5
 # model
 MODEL: 'pidnet_s'
 NUM_OUTPUTS: 2
 PRETRAINED: 'weights/PIDNet_S_ImageNet.pth.tar'
-CHECKPOINT: 'checkpoint_epoch_0.pth'
+CHECKPOINT: null
 # data
 TRAINSET: 'lists/mvseg_train.txt'
 VALIDSET: 'lists/mvseg_val.txt'

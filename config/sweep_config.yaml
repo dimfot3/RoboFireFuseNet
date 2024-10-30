@@ -15,6 +15,15 @@ parameters:
     distribution: int_uniform
     min: 5
     max: 12
+  WARMUP:
+    distribution: categorical
+    values: [0, 5, 10, 15, 20]
+  SCHED:
+    distribution: categorical
+    values: ['COS', 'POLY']
+  OPTIM:
+    distribution: categorical
+    values: ['ADAM', 'SGD']
   USE_OHEM:
     distribution: categorical
     values: [True, False]
