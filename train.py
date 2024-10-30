@@ -17,6 +17,7 @@ def train(model, train_data, val_data, args, logger):
             loss, curr_conf_mat = trainer.training_step(batch)
             conf_mat += curr_conf_mat
             running_loss += loss.item() / len(train_loader)
+            break
         # metrics
         metrics = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'])
         logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=False)

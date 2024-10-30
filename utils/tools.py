@@ -240,7 +240,7 @@ def calculate_metrics(confusion_matrix, runloss, cls_names = None, cls_weights=N
         precision[i] = TP / (TP + FP) if (TP + FP) != 0 else 1
         recall[i] = TP / (TP + FN) if (TP + FN) != 0 else 0
         f1_score[i] = 2 * precision[i] * recall[i] / (precision[i] + recall[i]) if (precision[i] + recall[i]) != 0 else 0
-        accuracy[i] = (TP + TN) / total_samples if total_samples != 0 else 1
+        accuracy[i] = TP / total_samples if total_samples != 0 else 1
         iou[i] = TP / (TP + FN + FP) if (TP + FN + FP) != 0 else 0
 
     # Calculate average metrics

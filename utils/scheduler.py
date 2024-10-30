@@ -24,6 +24,13 @@ class PolynomialDecayLR:
 
     def get_last_lr(self):
         return [group['lr'] for group in self.optimizer.param_groups]
+    
+    def state_dict(self):
+        return {
+        }
+
+    def load_state_dict(self, state_dict):
+        pass
 
 class CosineDecay:
     def __init__(self, optimizer, base_lr, epochs, num_batches, warmup):
