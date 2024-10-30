@@ -1,12 +1,12 @@
 # corsican params
 # general
-PROJECTNAME: 'Test'
+PROJECTNAME: 'PIDnetSync'
 SESSIONAME: 'Test'
-DEVICE: 'cpu'
-NUM_WORKERS: 10
+DEVICE: 'cuda:2'
+NUM_WORKERS: 15
 ONLINELOG: False
 SEED: 200
-STOPCOUNTER: 2
+STOPCOUNTER: 12
 VALID_FREQ: 2
 WARMUP: 5
 # model
@@ -42,7 +42,7 @@ ALIGN_CORNERS: True
 # loss and optimization
 LR: 0.0001
 BATCHSIZE: 8
-EPOCHS: 400
+EPOCHS: 250
 OPTIM: 'ADAM'
 SCHED: 'POLY'
 USE_OHEM: False

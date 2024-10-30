@@ -37,6 +37,7 @@ def main(train_args, sweep_args):
 
 if __name__ == '__main__':
     train_args = parse_args()
+    set_reproducibility(train_args['SEED'])
     sweep_args = read_sweep('./config/sweep_config.yaml')
     main(train_args, sweep_args)
 

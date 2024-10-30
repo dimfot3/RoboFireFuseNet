@@ -11,7 +11,7 @@ import shutil
 def test(trainer, test_dataset, args, logger):
     test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True, num_workers=args['NUM_WORKERS'])
     running_loss, conf_mat, conf_mat_inst = 0.0, np.zeros((args['NUM_CLASSES'], args['NUM_CLASSES'])), np.zeros((args['NUM_CLASSES'], args['NUM_CLASSES']))
-    for batch in tqdm(test_loader, desc='Validation'):
+    for batch in tqdm(test_loader, desc='Testing'):
         loss, curr_conf_mat, cur_conf_mat_inst = trainer.test_step(batch)
         conf_mat += curr_conf_mat
         conf_mat_inst += cur_conf_mat_inst

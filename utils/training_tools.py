@@ -30,6 +30,7 @@ class Trainer:
         self.stop_counter = args['STOPCOUNTER']
         self.start_epoch = 0
         self.best_metric = 0
+        self.stop_cur_counter = 0
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
 
@@ -117,10 +118,10 @@ class Trainer:
 
     def stop_sign(self, metrics):
         if metrics['val miou'] > self.best_metric:
-            self.best_metric, self.counter = metrics['val miou'], 0
+            self.best_metric, self.stop_cur_counter = metrics['val miou'], 0
         else:
-            self.counter += 1
-        if self.counter >= self.stop_counter:
+            self.stop_cur_counter += 1
+        if self.stop_cur_counter >= self.stop_counter:
             return True
         return False
     

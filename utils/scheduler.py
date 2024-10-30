@@ -23,7 +23,7 @@ class PolynomialDecayLR:
         if self.cur_epoch < self.warmup_epochs:
             lr = self.base_lr * self.cur_epoch / self.warmup_epochs
         else:
-            lr = max(np.real(self.base_lr * (1 - float(self.cur_iters) / self.max_iters + 1e-12) ** self.power), 1e-12)
+            lr = max(np.real(self.base_lr * (1 - float(self.cur_iters) / self.max_iters + 1e-12) ** self.power), 1e-8)
         self.optimizer.param_groups[0]['lr'] = lr
         if len(self.optimizer.param_groups) == 2:
             self.optimizer.param_groups[1]['lr'] = lr * self.nbb_mult
