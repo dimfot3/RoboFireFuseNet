@@ -154,7 +154,7 @@ class PIDNet(nn.Module):
 
     def make_input(self, x):
         B, N, H, W = x.size()
-        x_new = torch.zeros((B, self.channels, H, W))
+        x_new = torch.zeros((B, self.channels, H, W), dtype=x.dtype, device=x.device)
         for b in range(B):
             for n in range(N // 3):
                 img = x[b, n*3:(n+1)*3]
