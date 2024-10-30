@@ -142,6 +142,7 @@ class PIDNet(nn.Module):
         model_dict.update(pretrained_state)
         msg = 'Loaded {} parameters!'.format(len(pretrained_state))
         self.load_state_dict(model_dict, strict = False)
+        print(msg)
 
     def find_mode(self, img):
         """

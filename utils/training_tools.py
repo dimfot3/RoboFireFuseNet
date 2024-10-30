@@ -22,11 +22,12 @@ class Trainer:
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
-        self.scheduler = self.get_scheduler(args['LR'], args['EPOCHS'], (np.ceil(len_data / args['BATCHSIZE'])), args['WARMUP'])
+        self.scheduler = self.get_scheduler(args['SCHED'], args['LR'], args['EPOCHS'], (np.ceil(len_data / args['BATCHSIZE'])), args['WARMUP'])
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
+        self.cur_epoch = 0
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
 
@@ -101,10 +102,10 @@ class Trainer:
             exit()
         return optimizer
 
-    def get_scheduler(self, initial_lr, epochs, num_batches, warmup):
-        if self.model_name[:5] == 'async':
+    def get_scheduler(self, sched_name, initial_lr, epochs, num_batches, warmup):
+        if sched_name == 'COS':
             scheduler = CosineDecay(self.optimizer, initial_lr, epochs, num_batches, warmup)
-        elif self.model_name[:6] == 'pidnet':
+        elif sched_name == 'POLY':
             scheduler = PolynomialDecayLR(self.optimizer, initial_lr, epochs * num_batches, 0.9, 10)
         return scheduler
 
@@ -204,6 +205,6 @@ def get_model(args):
     elif 'async_m' == args['MODEL']:
         model = AsyncModel(128)
     if args['PRETRAINED'] is not None:
-        model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu'))
+        model.imgnet_pretrain(args['PRETRAINED'])
     model.to(device=args['DEVICE'])
     return model

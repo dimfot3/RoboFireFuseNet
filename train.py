@@ -8,16 +8,15 @@ from utils.logger import Logger
 
 
 def train(model, train_data, val_data, args, logger):
-    train_loader = DataLoader(train_data, batch_size=args['BATCHSIZE'], shuffle=True, num_workers=args['NUM_WORKERS'], prefetch_factor=2)
+    train_loader = DataLoader(train_data, batch_size=args['BATCHSIZE'], shuffle=True, num_workers=args['NUM_WORKERS'], prefetch_factor=2, drop_last=True)
     trainer = Trainer(args, model, len(train_data))
-    for epoch in range(args['EPOCHS']):
+    for epoch in range(trainer.start_epoch, args['EPOCHS']):
         running_loss, conf_mat = 0, np.zeros((args['NUM_CLASSES'], args['NUM_CLASSES']))
         # train loop
         for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}'):
             loss, curr_conf_mat = trainer.training_step(batch)
             conf_mat += curr_conf_mat
             running_loss += loss.item() / len(train_loader)
-            break
         # metrics
         metrics = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'])
         logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=False)

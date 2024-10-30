@@ -12,8 +12,8 @@ WARMUP: 5
 # model
 MODEL: 'pidnet_s'
 NUM_OUTPUTS: 2
-PRETRAINED: null
-CHECKPOINT: null
+PRETRAINED: 'weights/PIDNet_S_ImageNet.pth.tar'
+CHECKPOINT: 'checkpoint_epoch_10.pth'
 # data
 TRAINSET: 'lists/mvseg_train.txt'
 VALIDSET: 'lists/mvseg_val.txt'
@@ -46,6 +46,7 @@ LR: 0.0001
 BATCHSIZE: 8
 EPOCHS: 400
 OPTIM: 'ADAM'
+SCHED: 'POLY'
 USE_OHEM: False
 OHEMTHRES: 0.9
 OHEMKEEP: 131072

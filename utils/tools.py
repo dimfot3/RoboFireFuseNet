@@ -296,13 +296,13 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         non_bg_idxs = outputs!=0
         non_gt_idxs = label!=0
         outputs = val_data.label2color(outputs)
-        gt = (val_data.label2color(label)[:, :, ::-1]).astype('uint8')
-        gt[label == 2, 1:] = 0
-        gt[label == 1, :2] = 0
-        gt[label == 1, 2] = 255
+        # gt = (val_data.label2color(label)[:, :, ::-1]).astype('uint8')
+        # gt[label == 2, 1:] = 0
+        # gt[label == 1, :2] = 0
+        # gt[label == 1, 2] = 255
         images = np.transpose(images, (1, 2, 0))
         images[non_bg_idxs] = 0.19 * images[non_bg_idxs] + 0.78 * outputs[non_bg_idxs]
-        images[non_gt_idxs] = 0.29 * images[non_gt_idxs] + 0.68 * gt[non_gt_idxs]
+        # images[non_gt_idxs] = 0.29 * images[non_gt_idxs] + 0.68 * gt[non_gt_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))
