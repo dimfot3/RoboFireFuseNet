@@ -14,7 +14,7 @@ parameters:
   BATCHSIZE:
     distribution: int_uniform
     min: 5
-    max: 12
+    max: 64
   WARMUP:
     distribution: categorical
     values: [0, 5, 10, 15, 20]

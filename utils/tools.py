@@ -73,6 +73,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Setting the training parameters')
     parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='wildfire.yaml')
     parser.add_argument('--LR', type=float, help='Learning Rate')
+    parser.add_argument('--CHECKPOINT', type=str, help='Checkpoint')
     parser.add_argument('--BATCHSIZE', type=int, help='Batch Size')
     parser.add_argument('--WD', type=float, help='Weight decay')
     parser.add_argument('--SESSIONAME', type=str, help='Session Name')
@@ -151,8 +152,8 @@ def get_confusion_matrix_instancewise(seg_gt, output, num_class, k=0.5, ignore=2
 
         # Ignore specified class (if necessary)
         valid_mask = gt_mask != ignore
-        gt_mask = gt_mask[valid_mask].reshape(img_shape)
-        pred_mask = pred_mask[valid_mask].reshape(img_shape)
+        gt_mask = gt_mask[valid_mask].reshape(img_shape).cpu()
+        pred_mask = pred_mask[valid_mask].reshape(img_shape).cpu()
         labeled_gt, num_gt_instances = label1(gt_mask)  # Get instances in GT
         for gt_instance_id in range(0, num_gt_instances + 1):  # Skip background (ID 0)
             # Get binary mask for this ground truth instance
@@ -258,7 +259,7 @@ def calculate_metrics(confusion_matrix, runloss, cls_names = None, cls_weights=N
         f"{'val ' if val else ''}miou": miou,
         f"{'val ' if val else ''}avgloss": runloss}
     names = np.arange(num_classes) if (cls_names == None) else cls_names
-    cls_weights = np.ones(num_classes) if (cls_weights == None) else cls_weights
+    cls_weights = np.ones(num_classes) if (cls_weights == None) else cls_weights / np.sum(cls_weights)
     metrics[f'{"val " if val else ""}weighted_f1'] = 0
     for i in range(num_classes):
         metrics[f'{"val " if val else ""}precision {names[i]}'] = precision[i]

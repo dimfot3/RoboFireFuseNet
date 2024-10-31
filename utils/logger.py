@@ -3,6 +3,7 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 import os
 import numpy as np
+import shutil
 
 
 class WDBLogger:
@@ -20,7 +21,7 @@ class WDBLogger:
     
     def close(self):
         wandb.finish()
-        os.remove('./wandb')
+        # shutil.rmtree('./wandb')
 
 class TensorBoardLogger:
     def __init__(self, args, model=None):

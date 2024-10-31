@@ -20,7 +20,7 @@ def test(trainer, test_dataset, args, logger):
     metrics_inst = calculate_metrics(conf_mat_inst, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'], val=True)
     logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
     print('-'*shutil.get_terminal_size()[0])
-    logger.print_metrics(metrics_inst, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
+    # logger.print_metrics(metrics_inst, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
     qualitive_eval(lambda data: trainer.inference(data), test_dataset, 
                    ex_path=f'./outputs/{args["PROJECTNAME"]}/{args["SESSIONAME"]}/visualizations', name=f'TEST.png')
     return metrics
@@ -31,7 +31,7 @@ def main(args):
     model = get_model(args)
     args['ONLINELOG'] = False
     logger = Logger(args)
-    trainer = Trainer(args, model, len(test_dataset))    
+    trainer = Trainer(args, model, len(test_dataset), test=True)    
     test(trainer, test_dataset, args, logger)
     logger.close()
 

@@ -16,7 +16,7 @@ import torchvision.transforms.functional as VF
 
 
 class Trainer:
-    def __init__(self, args, model, len_data):
+    def __init__(self, args, model, len_data, test=False):
         self.model_name = args['MODEL']
         self.use_amp = False if args['DEVICE'] == 'cpu' else True
         self.model = model
@@ -32,7 +32,7 @@ class Trainer:
         self.best_metric = 0
         self.stop_cur_counter = 0
         if args['CHECKPOINT'] != None:
-            self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
+            self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])), test)
 
     def training_step(self, batch):
         self.model.train()
@@ -117,7 +117,7 @@ class Trainer:
         return loss
 
     def stop_sign(self, metrics):
-        if metrics['val miou'] > self.best_metric:
+        if metrics['val miou'] - self.best_metric > 0.01:
             self.best_metric, self.stop_cur_counter = metrics['val miou'], 0
         else:
             self.stop_cur_counter += 1
@@ -137,13 +137,14 @@ class Trainer:
         }
         torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}.pth'))
 
-    def load_checkpoint(self, path):
+    def load_checkpoint(self, path, test=False):
         checkpoint = torch.load(path, map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'])
-        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-        self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
-        self.start_epoch = checkpoint['epoch'] - 1
+        if(not test):
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
+            self.start_epoch = checkpoint['epoch'] - 1
         self.best_metric = checkpoint['best_metric']
         print('Checkpoint loaded!')
 
