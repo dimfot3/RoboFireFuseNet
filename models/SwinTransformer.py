@@ -23,6 +23,8 @@ class WMSA(nn.Module):
         self.type=type
         self.embedding_layer = nn.Linear(self.input_dim, 3*self.input_dim, bias=True)
 
+        # TODO recover
+        # self.relative_position_params = nn.Parameter(torch.zeros(self.n_heads, 2 * window_size - 1, 2 * window_size -1))
         self.relative_position_params = nn.Parameter(torch.zeros((2 * window_size - 1)*(2 * window_size -1), self.n_heads))
 
         self.linear = nn.Linear(self.input_dim, self.output_dim)
@@ -64,6 +66,7 @@ class WMSA(nn.Module):
         w_windows = x.size(2)
         # sqaure validation
         assert h_windows == w_windows
+
         x = rearrange(x, 'b w1 w2 p1 p2 c -> b (w1 w2) (p1 p2) c', p1=self.window_size, p2=self.window_size)
         qkv = self.embedding_layer(x)
         q, k, v = rearrange(qkv, 'b nw np (threeh c) -> threeh b nw np c', c=self.head_dim).chunk(3, dim=0)
@@ -82,7 +85,7 @@ class WMSA(nn.Module):
         output = rearrange(output, 'b (w1 w2) (p1 p2) c -> b (w1 p1) (w2 p2) c', w1=h_windows, p1=self.window_size)
 
         if self.type!='W': output = torch.roll(output, shifts=(self.window_size//2, self.window_size//2), dims=(1,2))
-        return output, q, k, v
+        return output
     
     def relative_embedding(self):
         cord = torch.tensor(np.array([[i, j] for i in range(self.window_size) for j in range(self.window_size)]))
@@ -113,65 +116,9 @@ class Block(nn.Module):
         )
 
     def forward(self, x):
-        x_p1, q, k, v = self.msa(self.ln1(x))
-        x = x + self.drop_path(x_p1)
+        x = x + self.drop_path(self.msa(self.ln1(x)))
         x = x + self.drop_path(self.mlp(self.ln2(x)))
-        return x, q, k, v
+        return x
 
-class SwinTransformer(nn.Module):
-    """ Implementation of Swin Transformer https://arxiv.org/abs/2103.14030
-    In this Implementation, the standard shape of data is (b h w c), which is a similar protocal as cnn.
-    """
-    #TODO make layers using configs
-    def __init__(self, config=[2,2], dim=96, drop_path_rate=0.2, input_resolution=252, input_c=3):
-        super(SwinTransformer, self).__init__()
-        self.config = config
-        self.dim = dim
-        self.head_dim = 32
-        self.window_size = 8
-        # self.patch_partition = Rearrange('b c (h1 sub_h) (w1 sub_w) -> b h1 w1 (c sub_h sub_w)', sub_h=4, sub_w=4)
 
-        # drop path rate for each layer
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
-
-        self.prestages = nn.ModuleList([nn.Sequential(nn.Conv2d(input_c, dim, kernel_size=4, stride=4),
-                       Rearrange('b c h w -> b h w c'),
-                       nn.LayerNorm(dim))] + \
-                       [nn.Sequential(Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
-                       nn.LayerNorm((4*i)*dim), nn.Linear((4*i)*dim, (2*i)*dim, bias=False)) for i in range(1, len(config))])
-        self.tf_arr = nn.ModuleList([])
-        for i_tf, n_tf in enumerate(self.config):
-            for i in range(n_tf):
-                mode = 'W' if ((i % 2)==0) else 'SW'
-                self.tf_arr.append(Block((2**i_tf) * dim, (2**i_tf) * dim, self.head_dim, self.window_size, 
-                                    dpr[i], mode, input_resolution//(4 * (2**i_tf))))  
-        self.apply(self._init_weights)
-
-    def _init_weights(self, m):
-        if isinstance(m, nn.Linear):
-            trunc_normal_(m.weight, std=.02)
-            if m.bias is not None:
-                nn.init.constant_(m.bias, 0)
-        elif isinstance(m, nn.LayerNorm):
-            nn.init.constant_(m.bias, 0)
-            nn.init.constant_(m.weight, 1.0)
-
-    def forward(self, x):
-        q_arr, k_arr, v_arr = [], [], []
-        for i_tf, n_tf in enumerate(self.config):
-            x = self.prestages[i_tf](x)
-            for i in range(n_tf):
-                x, q, k, v = self.tf_arr[sum(self.config[:i_tf]) + i](x)
-                q_arr.append(q)
-                k_arr.append(k)
-                v_arr.append(v)
-        return x, q_arr, k_arr, v_arr
-
-if __name__ == '__main__':
-    test_model = SwinTransformer(config=[2,2], dim=64, drop_path_rate=0.2, input_resolution=256).cuda()
-    n_parameters = sum(p.numel() for p in test_model.parameters() if p.requires_grad)
-    dummy_input = torch.rand(3, 3, 256, 256).cuda()
-    output, q_arr, k_arr, v_arr = test_model(dummy_input)
-    print(output.size(), len(q_arr), q_arr[0].shape)
-    summary(test_model, dummy_input)
 
