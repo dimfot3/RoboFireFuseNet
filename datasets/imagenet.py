@@ -74,18 +74,16 @@ class ImageNet(Dataset):
 
         return image, mask
 
-    def random_grayscale(self, image, grayscale_fraction=0.5):
+    def random_grayscale(self, image):
         gray_image = image.mean(dim=0, keepdim=True)  # Shape [1, H, W]
         gray_image = gray_image.repeat(3, 1, 1)  # Shape [3, H, W]
         gray_image[1:] *= 0
-        if np.random.rand() < grayscale_fraction:
-            return gray_image
-        else:
-            return image
+        return gray_image
     
     def roll_image(self, image, max_shift=32):
         shift_amount = np.random.randint(-max_shift, max_shift + 1)
-        rolled_image = torch.roll(image, shifts=shift_amount, dims=3)  # Shift along the width (W dimension)
+        rolled_image = torch.roll(image, shifts=shift_amount, dims=-1)  # Shift along the width (W dimension)
+        rolled_image = torch.roll(image, shifts=shift_amount, dims=-2)  # Shift along the width (W dimension)
         return rolled_image
 
     def __getitem__(self, idx):
@@ -94,16 +92,15 @@ class ImageNet(Dataset):
         if self.transform:
             image = self.transform(image).unsqueeze(0)
         label = torch.clone(image[0]).detach()
-        n_times = 4
-        images = torch.repeat_interleave(image, n_times, dim=0)
-        for n_img, img in enumerate(images[:-1]):
-            images[n_img] = self.roll_image(image, max_shift=32)
-            images[n_img] = self.random_grayscale(img)
-            images[n_img], _ = self.random_black_patches(img, patch_size=32, black_fraction=0.4)
-        images[-1], mask = self.random_black_patches(images[-1], patch_size=32, black_fraction=0.4)
+        images = torch.repeat_interleave(image, 2, dim=0)
+        images[1] = self.roll_image(images[1], max_shift=32)
+        images[1] = self.random_grayscale(images[1])
+        images[1], _ = self.random_black_patches(images[1], patch_size=32, black_fraction=0.3)
+        images[0], mask = self.random_black_patches(images[0], patch_size=32, black_fraction=0.5)
         N, C, H, W = images.shape
-        images = images.reshape(N * C, H, W)
+        images = images.reshape(N * C, H, W)[:-2]
         return images, label, mask
+
 
 if __name__ == '__main__':
     transform_train = transforms.Compose([
@@ -112,10 +109,11 @@ if __name__ == '__main__':
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
     dataset = ImageNet('../Datasets/FINLAND', transform_train)
-    f, ax = plt.subplots(1, 5)
+    f, ax = plt.subplots(1, 3)
     imgs, label, mask = dataset[0]
-    for i, img in enumerate(imgs.reshape(-1, 3, 256, 256)):
-        img = np.transpose(img.detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])
-        ax[i].imshow(img)
+    img = np.transpose(imgs[:3].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])
+    img2 = np.transpose(imgs[-1:].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]).mean() + np.array([0.485, 0.456, 0.406]).mean()
+    ax[0].imshow(img)
+    ax[1].imshow(img2)
     ax[-1].imshow(np.transpose(mask.detach().cpu().numpy(), (1, 2, 0)))
     plt.show()
