@@ -18,6 +18,18 @@ bn_mom = 0.1
 algc = False
 
 
+def largest_divisor_less_than_k(n, k):
+    # Start with no divisor
+    largest_divisor = -1
+
+    for i in range(1, int(math.sqrt(n)) + 1):
+        if n % i == 0:  # i is a divisor of n
+            if i < k:
+                largest_divisor = max(largest_divisor, i)
+            if n // i < k:
+                largest_divisor = max(largest_divisor, n // i)
+    return largest_divisor
+
 class PIDnetTF(nn.Module):
 
     def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, window_size=8, input_resolution=512, layer5='conv'):
@@ -41,7 +53,7 @@ class PIDnetTF(nn.Module):
         drop_path_rate = 0.2
         input_resolution = 512
         begin = 0
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config[:-1] if layer5=='conv' else config))]
         self.stage1 = [Rearrange('b c h w -> b h w c'),
                        nn.LayerNorm(planes),] + \
                       [Block(planes, planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//4) 
@@ -62,10 +74,11 @@ class PIDnetTF(nn.Module):
                       [Block(8*planes, 8*planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//32)
                       for i in range(config[3])] + [Rearrange('b h w c-> b c h w')]
         begin += config[3]
-        self.stage5 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
-                       nn.LayerNorm(32*planes), nn.Linear(32*planes, 16*planes, bias=False),] + \
-                      [Block(16*planes, 16*planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//64)
-                      for i in range(config[4])] + [Rearrange('b h w c-> b c h w')]
+        if layer5!='conv':
+            self.stage5 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
+                        nn.LayerNorm(32*planes), nn.Linear(32*planes, 16*planes, bias=False),] + \
+                        [Block(16*planes, 16*planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//64)
+                        for i in range(config[4])] + [Rearrange('b h w c-> b c h w')]
         self.layer1 = nn.Sequential(*self.stage1)
         self.layer2 = nn.Sequential(*self.stage2)
         self.layer3 = nn.Sequential(*self.stage3)
@@ -274,12 +287,12 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='conv')
+    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='conv', window_size=7)
     model.eval()
     model.to(device)
     iterations = None
-    input = torch.randn(1, 4, 384, 512).to(device)
-    input, reverse = make_square_input(input, 512)
+    input = torch.randn(1, 4, 384, 448).to(device)
+    input, reverse = make_square_input(input, 448)
     summary(model, input)
 
 

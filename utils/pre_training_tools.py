@@ -119,9 +119,9 @@ def get_model(args):
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=4)
     elif 'async_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='tf', input_resolution=args['BASE_SIZE'])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='tf', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
     elif 'async_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
     if args['PRETRAINED'] is not None:
         model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu'))
     model.to(device=args['DEVICE'])

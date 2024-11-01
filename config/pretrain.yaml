@@ -2,7 +2,7 @@
 # general
 PROJECTNAME: 'Test'
 SESSIONAME: 'Test'
-DEVICE: 'cuda:0'
+DEVICE: 'cpu'
 NUM_WORKERS: 15
 ONLINELOG: False
 SEED: 200
