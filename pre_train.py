@@ -20,7 +20,7 @@ def train(model, train_data, args, logger):
             cur_itter += 1
             logger.log({'loss': loss.item()}, int(cur_itter + epoch * len(train_loader)), trainer.scheduler)
             if cur_itter % args['VALID_FREQ'] == 0:
-                trainer.save_checkpoint(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME']), epoch, cur_itter)
+                trainer.save_checkpoint(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME']), epoch, 0)
                 qualitive_eval_pretrain(lambda data: trainer.inference(data), train_data, 
                     ex_path=f'./outputs/{args["PROJECTNAME"]}/{args["SESSIONAME"]}/visualizations', name=f'Epoch_{epoch + 1}.png')
         # metrics

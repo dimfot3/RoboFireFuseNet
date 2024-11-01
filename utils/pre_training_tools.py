@@ -7,7 +7,7 @@ from .total_loss import MaskedMSELoss
 from .scheduler import CosineDecay
 import torch.optim as optim
 from models.pidnet import PIDNet
-from models.AsyncModel import AsyncModel
+from models.Asyncv2 import PIDnetTF, make_square_input
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from datasets.imagenet import ImageNet
@@ -15,7 +15,7 @@ from datasets.imagenet import ImageNet
 
 class Trainer:
     def __init__(self, args, model, len_data):
-        self.use_amp = False if args['DEVICE'] == 'cpu' else False
+        self.use_amp = False if args['DEVICE'] == 'cpu' else True
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
@@ -27,6 +27,7 @@ class Trainer:
         self.update_freq = args['UPDATE_FREQ']
         self.iter_counter = 1
         self.start_epoch = 0
+        self.base_size = args['BASE_SIZE']
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])))
            
@@ -35,12 +36,15 @@ class Trainer:
         images, labels, mask = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.long, device=self.device)
         with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=self.use_amp):
-            output = self.model(images)
-            output_mask = F.interpolate(
-                                output[1],
-                                size=[images.shape[-2], images.shape[-1]],
-                                mode='bilinear', align_corners=True)
-            loss = self.criterion.get_loss(output_mask, labels, mask)
+            inp_images, rev_pad = make_square_input(images, self.base_size)
+            outputs = self.model(inp_images)
+            for i, output in enumerate(outputs):
+                outputs[i] = F.interpolate(
+                                    outputs[i],
+                                    size=[images.shape[-2], images.shape[-1]],
+                                    mode='bilinear', align_corners=True)
+                outputs[i] = rev_pad(outputs[i])
+            loss = self.criterion.get_loss(outputs[1], labels, mask)
         loss = loss.mean() / self.update_freq
         self.scaler.scale(loss).backward()
         if (self.iter_counter % self.update_freq) == 0:
@@ -52,29 +56,16 @@ class Trainer:
         self.iter_counter += 1
         return loss.detach() * self.update_freq
 
-    def valid_step(self, batch):
-        self.model.eval()
-        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
-        output = self.model(images)
-        output_mask = F.interpolate(
-                            output[1],
-                            size=[images.shape[-2], images.shape[-1]],
-                            mode='bilinear', align_corners=True)
-        conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
-        loss = losses.mean()
-        return loss.detach(), conf_mat
-
     def inference(self, data):
         self.model.eval()
         images = data.to(dtype=torch.float, device=self.device)
-        output = self.model(images)
+        inp_images, rev_pad = make_square_input(images, self.base_size)
+        output = self.model(inp_images)
         output = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
-        # output = torch.argmax(output, dim=1)
+        output = rev_pad(output)
         return output
 
     def get_optimizer(self, args, model):
@@ -91,13 +82,6 @@ class Trainer:
 
     def stop_sign(self, metrics):
         return False
-        if metrics['val avg_f1'] > self.best_metric:
-            self.best_metric, self.counter = metrics['val avg_f1'], 0
-        else:
-            self.counter += 1
-        if self.counter >= self.args['STOPCOUNTER']:
-            return True
-        return False
     
     def save_checkpoint(self, path, epoch, itter=0):
         os.makedirs(f'{path}', exist_ok=True)
@@ -111,7 +95,7 @@ class Trainer:
         torch.save(checkpoint, os.path.join(path, f'checkpoint_epoch_{epoch}_{itter}.pth'))
 
     def load_checkpoint(self, path):
-        checkpoint = torch.load(path)
+        checkpoint = torch.load(path, map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
@@ -129,15 +113,15 @@ def get_dataset(args):
 
 def get_model(args):
     if 'pidnet_s' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=12)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4)
     elif 'pidnet_m' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=12)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4)
     elif 'pidnet_l' == args['MODEL']:
-        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=12)
+        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=4)
     elif 'async_s' == args['MODEL']:
-        model = AsyncModel(64)
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='tf', input_resolution=args['BASE_SIZE'])
     elif 'async_m' == args['MODEL']:
-        model = AsyncModel(128)
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'])
     if args['PRETRAINED'] is not None:
         model.load_state_dict(torch.load(args['PRETRAINED'], map_location='cpu'))
     model.to(device=args['DEVICE'])
