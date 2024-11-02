@@ -201,11 +201,11 @@ def get_dataset(args, test=False):
 
 def get_model(args):
     if 'pidnet_s' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' != 'fusion') else 4)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=3 if (args['MODE'] != 'fusion') else 4)
     elif 'pidnet_m' == args['MODEL']:
-        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3 if ('MODE' != 'fusion') else 4)
+        model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3 if (args['MODE'] != 'fusion') else 4)
     elif 'pidnet_l' == args['MODEL']:
-        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if ('MODE' != 'fusion') else 4)
+        model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if (args['MODE'] != 'fusion') else 4)
     elif 'async_s' == args['MODEL']:
         model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='tf', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
     elif 'async_m' == args['MODEL']:
