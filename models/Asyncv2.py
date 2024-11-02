@@ -51,7 +51,6 @@ class PIDnetTF(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         config = [2, 2, 18, 2, 2]
         drop_path_rate = 0.2
-        input_resolution = 512
         begin = 0
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config[:-1] if layer5=='conv' else config))]
         self.stage1 = [Rearrange('b c h w -> b h w c'),
@@ -287,12 +286,10 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='conv', window_size=7)
+    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='tf', window_size=7)
     model.eval()
     model.to(device)
     iterations = None
     input = torch.randn(1, 4, 384, 448).to(device)
     input, reverse = make_square_input(input, 448)
     summary(model, input)
-
-
