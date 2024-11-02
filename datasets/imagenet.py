@@ -99,6 +99,7 @@ class ImageNet(Dataset):
         images[0], mask = self.random_black_patches(images[0], patch_size=32, black_fraction=0.5)
         N, C, H, W = images.shape
         images = images.reshape(N * C, H, W)[:-2]
+        mask = torch.ones_like(mask) - mask
         return images, label, mask
 
 

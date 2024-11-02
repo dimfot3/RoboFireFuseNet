@@ -71,7 +71,7 @@ def parse_args():
     """
 
     parser = argparse.ArgumentParser(description='Setting the training parameters')
-    parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='pretrain.yaml')
+    parser.add_argument('--yaml_file', type=str, help='Path to YAML file', default='wildfire.yaml')
     parser.add_argument('--LR', type=float, help='Learning Rate')
     parser.add_argument('--CHECKPOINT', type=str, help='Checkpoint')
     parser.add_argument('--BATCHSIZE', type=int, help='Batch Size')

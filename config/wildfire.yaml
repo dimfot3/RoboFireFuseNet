@@ -1,10 +1,10 @@
 # corsican params
 # general
-PROJECTNAME: 'PIDnetSync'
-SESSIONAME: 'Bestv0_weights'
-DEVICE: 'cuda:1'
+PROJECTNAME: 'PIDnetNoSync'
+SESSIONAME: 'FrameApart3'
+DEVICE: 'cuda:0'
 NUM_WORKERS: 15
-ONLINELOG: True
+ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 12
 VALID_FREQ: 2
@@ -13,14 +13,14 @@ WARMUP: 20
 MODEL: 'pidnet_s'
 NUM_OUTPUTS: 2
 PRETRAINED: 'weights/PIDNet_S_ImageNet.pth.tar'
-CHECKPOINT: 'checkpoint_epoch_80.pth'
+CHECKPOINT: null
 # data
-TRAINSET: 'lists/mvseg_train.txt'
-VALIDSET: 'lists/mvseg_val.txt'
-TESTSET: 'lists/mvseg_test.txt'
+TRAINSET: 'lists/train_mvseg.txt'
+VALIDSET: 'lists/val_mvseg.txt'
+TESTSET: 'lists/test_mvseg.txt'
 ROOTDATASET: '../Datasets/'
 N_FRAMES: 2
-MAX_FR_APART: 0
+MAX_FR_APART: 3
 NUM_CLASSES: 26
 CLS_NAMES: ['background', 'Car', 'Bus', 'Motorcycle', 'Bicycle', 'Pedestrian', 'Motorcyclist', 'Bicyclist', 'Cart', 'Bench', 'Umbrella', 'Box', 'Pole', 'Street_lamp', 'Traffic_light', 'Traffic_sign', 'Car_stop', 'Color_cone', 'Sky', 'Road', 'Sidewalk', 'Curb', 'Vegetation', 'Terrain', 'Building', 'Ground']
 #['bg', 'smoke', 'fire']
