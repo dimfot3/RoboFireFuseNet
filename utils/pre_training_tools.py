@@ -19,7 +19,7 @@ class Trainer:
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
-        self.scheduler = self.get_scheduler(args['LR'], args['EPOCHS'], np.ceil(len_data / args['BATCHSIZE']), args['WARMUP'])
+        self.scheduler = self.get_scheduler(args['LR'], args['EPOCHS'], np.ceil(len_data / (args['UPDATE_FREQ'] * args['BATCHSIZE'])), args['WARMUP'])
         self.scaler = torch.cuda.amp.GradScaler(enabled=self.use_amp)
         self.device = args['DEVICE']
         self.num_classes = args['NUM_CLASSES']
