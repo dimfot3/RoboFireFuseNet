@@ -163,7 +163,8 @@ def get_dataset(args, test=False):
                           bd_dilate_size=4,
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
-                          mode=args['MODE'])
+                          mode=args['MODE'],
+                          interpolation=args['INTERPOLATION'])
     
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
@@ -179,7 +180,8 @@ def get_dataset(args, test=False):
                           bd_dilate_size=4,
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
-                          mode=args['MODE'])
+                          mode=args['MODE'],
+                          interpolation=args['INTERPOLATION'])
     if test:
         test_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['TESTSET'],
@@ -195,7 +197,8 @@ def get_dataset(args, test=False):
                           bd_dilate_size=4,
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
-                          mode=args['MODE'])
+                          mode=args['MODE'],
+                          interpolation=args['INTERPOLATION'])
         return train_dataset, val_dataset, test_dataset
     return train_dataset, val_dataset
 

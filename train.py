@@ -14,7 +14,6 @@ def train(model, train_data, val_data, args, logger):
         running_loss, conf_mat = 0, np.zeros((args['NUM_CLASSES'], args['NUM_CLASSES']))
         # train loop
         for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}'):
-            print(batch[-1])
             loss, curr_conf_mat = trainer.training_step(batch)
             conf_mat += curr_conf_mat
             running_loss += loss.item() / len(train_loader)

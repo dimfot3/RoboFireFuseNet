@@ -29,7 +29,8 @@ class WildFire(BaseDataset):
                  frames_appart=5,
                  seed=200,
                  load_cache=True,
-                 mode='fusion'):
+                 mode='fusion',
+                 interpolation=False):
 
         self.mean = mean
         self.std = std
@@ -40,6 +41,7 @@ class WildFire(BaseDataset):
         self.list_path = list_path
         self.num_classes = num_classes
         self.load_cache = load_cache
+        self.interpolation = interpolation
         self.mode = mode
         self.multi_scale = multi_scale
         self.flip = flip
@@ -149,12 +151,18 @@ class WildFire(BaseDataset):
         target_name = target_row['name']
         folder = target_row['folder']
         candidates = pd.concat([candidates, target_row.to_frame().T], axis=0, ignore_index=True)
-        idxs = np.argsort(candidates['id'].to_numpy() - target_row['id'])[::-1]
+        idxs = np.argsort(candidates['id'].to_numpy() - int(target_row['id']))[::-1]
         selected_candidates = candidates.iloc[idxs[:(self.n_stack - 1)]]
         images = [os.path.join(folder, name) for name in selected_candidates['name'].tolist()]
-        images.append(os.path.join(folder, target_name))
         names = selected_candidates['name'].tolist()
+        if (candidates['id'].to_numpy().max() != int(target_row['id'])) and \
+            ((candidates['id'].to_numpy().min() != int(target_row['id']))) and self.interpolation:
+            images.append(os.path.join(folder, candidates.iloc[idxs[-1]]['name']))
+            names.append(candidates.iloc[idxs[-1]]['name'])
+        images.append(os.path.join(folder, target_name))
         names.append(target_name)
+        if self.interpolation and len(images) == self.n_stack:
+            images[0] = images[-1]
         return images, names
     
     def get_async_multi_modal_inputs(self, list_of_imgs):
@@ -163,6 +171,8 @@ class WildFire(BaseDataset):
         for i in range(len(list_of_imgs)):
             replacement = start_with if i % 2 == 0 else 'ir' if start_with == 'rgb' else 'rgb'
             modal_file_paths.append(os.path.join(self.root, list_of_imgs[i].replace('XXX', replacement)))
+        if self.interpolation and (len(modal_file_paths) != self.n_stack):
+            modal_file_paths[0] = modal_file_paths[0].replace(*(['ir', 'rgb'] if start_with =='ir' else ['rgb', 'ir']))
         label_path = os.path.join(self.root, list_of_imgs[-1].replace('XXX', 'gt') + '.png')        # label is in png as there must be no compression
         extensions = ['png', 'jpg']
         existing_files = []
@@ -185,6 +195,10 @@ class WildFire(BaseDataset):
                 img = np.asarray(img)
                 img = img.reshape(*(img.shape[:2]), -1)
                 loaded_images.append(img)
+        if(len(images)!=self.n_stack):
+            loaded_images[0] = loaded_images[0] * 0.5 + loaded_images[1] * 0.5
+            loaded_images.pop(1)
+            names.pop(1)
         with Image.open(label) as label_img:
             label = np.asarray(label_img)
             label = label if len(label.shape) == 2 else self.color2label(label)
@@ -227,7 +241,7 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
-                          list_path='lists/mvseg_test.txt',
+                          list_path='lists/test_mvseg.txt',
                           num_classes=25,
                           multi_scale=True,
                           flip=True,
@@ -238,10 +252,10 @@ if __name__ == '__main__':
                           crop_size=[272, 336],
                           base_size=336,
                           bd_dilate_size=4,
-                          n_stack=1,
-                          frames_appart=0,
+                          n_stack=2,
+                          frames_appart=4,
                           load_cache=True,
-                          mode='fusion')
+                          mode='fusion', interpolation=True)
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
         images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
