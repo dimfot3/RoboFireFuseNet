@@ -2,7 +2,7 @@
 # general
 PROJECTNAME: 'PIDnetNoSync'
 SESSIONAME: 'FrameApart3'
-DEVICE: 'cuda:0'
+DEVICE: 'cpu'
 NUM_WORKERS: 15
 ONLINELOG: False
 SEED: 200
@@ -10,9 +10,9 @@ STOPCOUNTER: 12
 VALID_FREQ: 2
 WARMUP: 20
 # model
-MODEL: 'pidnet_s'
+MODEL: 'async_s'
 NUM_OUTPUTS: 2
-PRETRAINED: 'weights/PIDNet_S_ImageNet.pth.tar'
+PRETRAINED: 'weights/pretrained_custom_model.pth'
 CHECKPOINT: null
 # data
 TRAINSET: 'lists/train_mvseg.txt'
@@ -20,12 +20,13 @@ VALIDSET: 'lists/val_mvseg.txt'
 TESTSET: 'lists/test_mvseg.txt'
 ROOTDATASET: '../Datasets/'
 N_FRAMES: 2
-MAX_FR_APART: 3
+MAX_FR_APART: 0
 NUM_CLASSES: 26
 CLS_NAMES: ['background', 'Car', 'Bus', 'Motorcycle', 'Bicycle', 'Pedestrian', 'Motorcyclist', 'Bicyclist', 'Cart', 'Bench', 'Umbrella', 'Box', 'Pole', 'Street_lamp', 'Traffic_light', 'Traffic_sign', 'Car_stop', 'Color_cone', 'Sky', 'Road', 'Sidewalk', 'Curb', 'Vegetation', 'Terrain', 'Building', 'Ground']
 #['bg', 'smoke', 'fire']
 MODE: 'fusion'
 MULTISCALE: True
+INTERPOLATION: True
 FLIP: True
 BRIGHTNESS: False
 CONTRAST: False
@@ -33,8 +34,8 @@ ONE_INP_AUG: False           # this is for mid fusion, after attention
 SINGLE_SOURCE_AUG: False
 IGNORE_LABEL: 255
 SCALE_FACTOR: 10
-CROP_SIZE: [320, 480]
-BASE_SIZE: 480
+CROP_SIZE: [448, 448]
+BASE_SIZE: 448
 # CROP_SIZE: [272, 336]
 # BASE_SIZE: 336
 # 0.11, 0.14, 0.75

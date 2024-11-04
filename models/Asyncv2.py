@@ -181,7 +181,10 @@ class PIDnetTF(nn.Module):
         return layer
     
     def imgnet_pretrain(self, path):
-        pretrained_state = torch.load(path, map_location='cpu')['state_dict']
+        try:
+            pretrained_state = torch.load(path, map_location='cpu')['state_dict']
+        except:
+            pretrained_state = torch.load(path, map_location='cpu')['model_state_dict']
         model_dict = self.state_dict()
         pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
         model_dict.update(pretrained_state)
@@ -197,19 +200,20 @@ class PIDnetTF(nn.Module):
             return 1
         return 0
 
-    # def make_input(self, x):
-    #     B, N, H, W = x.size()
-    #     x_new = torch.zeros((B, self.channels, H, W), dtype=x.dtype, device=x.device)
-    #     for b in range(B):
-    #         for n in range(N // 3):
-    #             img = x[b, n*3:(n+1)*3]
-    #             if self.find_mode(img) == 1:
-    #                 x_new[b, -1] = img[0]
-    #             else:
-    #                 x_new[b, :3] = img
-    #     return x_new
+    def make_input(self, x):
+        B, N, H, W = x.size()
+        x_new = torch.zeros((B, self.channels, H, W), dtype=x.dtype, device=x.device)
+        for b in range(B):
+            for n in range(N // 3):
+                img = x[b, n*3:(n+1)*3]
+                if self.find_mode(img) == 1:
+                    x_new[b, -1] = img[0]
+                else:
+                    x_new[b, :3] = img
+        return x_new
 
     def forward(self, x):
+        x = self.make_input(x)
         x = self.conv1(x)
         x = self.layer1(x)
         x = self.relu(self.layer2(self.relu(x)))
