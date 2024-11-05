@@ -79,10 +79,9 @@ class Trainer:
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        conf_mat_inst = get_confusion_matrix_instancewise(labels, output_mask, self.num_classes, ignore=self.ingore_label, k=0.1)
         losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
         loss = losses.mean()
-        return loss.detach(), conf_mat, conf_mat_inst
+        return loss.detach(), conf_mat
 
     def inference(self, data):
         self.model.eval()
@@ -210,7 +209,7 @@ def get_model(args):
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if (args['MODE'] != 'fusion') else 4)
     elif 'async_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='tf', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
     elif 'async_m' == args['MODEL']:
         model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
     if args['PRETRAINED'] is not None:

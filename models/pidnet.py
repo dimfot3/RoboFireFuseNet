@@ -136,7 +136,10 @@ class PIDNet(nn.Module):
         return layer
     
     def imgnet_pretrain(self, path):
-        pretrained_state = torch.load(path, map_location='cpu')['state_dict']
+        try:
+            pretrained_state = torch.load(path, map_location='cpu')['state_dict']
+        except:
+            pretrained_state = torch.load(path, map_location='cpu')['model_state_dict']
         model_dict = self.state_dict()
         pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
         model_dict.update(pretrained_state)
