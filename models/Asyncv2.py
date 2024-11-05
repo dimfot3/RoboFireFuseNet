@@ -17,19 +17,6 @@ BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
 algc = False
 
-
-def largest_divisor_less_than_k(n, k):
-    # Start with no divisor
-    largest_divisor = -1
-
-    for i in range(1, int(math.sqrt(n)) + 1):
-        if n % i == 0:  # i is a divisor of n
-            if i < k:
-                largest_divisor = max(largest_divisor, i)
-            if n // i < k:
-                largest_divisor = max(largest_divisor, n // i)
-    return largest_divisor
-
 class PIDnetTF(nn.Module):
 
     def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, window_size=8, input_resolution=512, layer5='conv'):
@@ -38,6 +25,7 @@ class PIDnetTF(nn.Module):
         self.channels = channels
         self.head_dim = head_dim
         self.window_size = window_size
+        self.pos_param = nn.Parameter(torch.randn(2 if channels > 3 else 1, 1))
         # I Branch
         self.conv1 =  nn.Sequential(
                           nn.Conv2d(channels,planes,kernel_size=3, stride=2, padding=1),
@@ -207,9 +195,9 @@ class PIDnetTF(nn.Module):
             for n in range(N // 3):
                 img = x[b, n*3:(n+1)*3]
                 if self.find_mode(img) == 1:
-                    x_new[b, -1] = img[0]
+                    x_new[b, -1] = img[0] + self.pos_param[n]
                 else:
-                    x_new[b, :3] = img
+                    x_new[b, :3] = img + self.pos_param[n]
         return x_new
 
     def forward(self, x):
