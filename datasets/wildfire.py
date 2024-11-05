@@ -241,9 +241,9 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
-                          list_path='lists/test_mvseg.txt',
+                          list_path='lists/mvseg_test.txt',
                           num_classes=25,
-                          multi_scale=True,
+                          multi_scale=False,
                           flip=True,
                           brightness=True,
                           contrast=True,

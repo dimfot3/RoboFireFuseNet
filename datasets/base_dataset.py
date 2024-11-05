@@ -157,7 +157,7 @@ class BaseDataset(data.Dataset):
                                                 rand_scale=rand_scale)
         else:
             images, label, edge = self.multi_scale_aug(images, label, edge,
-                                                rand_scale=1, rand_crop=False)  
+                                                rand_scale=1, rand_crop=True)
         if brightness and (np.random.random() > 0.85):
             images = self.change_brightness(images)
         if contrast and (np.random.random() > 0.85):
