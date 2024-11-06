@@ -274,6 +274,7 @@ def make_square_input(x, base=512):
     reverse_pad = lambda x: x[:, :, padding[2]:-padding[3] or None, padding[0]:-padding[1] or None]
     return x, reverse_pad
 
+from time import time
 if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
@@ -284,4 +285,7 @@ if __name__ == '__main__':
     iterations = None
     input = torch.randn(1, 4, 384, 448).to(device)
     input, reverse = make_square_input(input, 448)
-    summary(model, input)
+    t0 = time()
+    out = model(input)
+    t1 = time()
+    print(t1 - t0)

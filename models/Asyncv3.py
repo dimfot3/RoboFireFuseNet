@@ -1,275 +1,233 @@
-
-from typing import Tuple, List
-
+# ------------------------------------------------------------------------------
+# Written by Jiacong Xu (jiacong.xu@tamu.edu)
+# ------------------------------------------------------------------------------
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import time
+import numpy as np
+import sys
+sys.path.insert(0, './models/')
+from pidnet_utils import BasicBlock, Bottleneck, segmenthead, DAPPM, PAPPM, PagFM, Bag, Light_Bag
+import math
+from torchsummary import summary
+import os
+from SwinTransformerv2 import SwinTransformerV2
+BatchNorm2d = nn.BatchNorm2d
+bn_mom = 0.1
+algc = False
 
-from SwinTransformerv2 import PatchEmbedding, SwinTransformerStage
+class PIDnetTF(nn.Module):
 
-__all__: List[str] = ["SwinTransformerV2"]
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, window_size=8, input_resolution=(384, 448)):
+        super(PIDnetTF, self).__init__()
+        self.augment = augment
+        self.channels = channels
+        self.head_dim = head_dim
+        self.window_size = window_size
+        self.pos_param = nn.Parameter(torch.randn(2 if channels > 3 else 1, 1))
+        # I Branch
+        self.conv1 =  nn.Sequential(
+                          nn.Conv2d(channels,planes,kernel_size=1, stride=1),
+                      )
+
+        self.relu = nn.ReLU(inplace=True)
+        self.tf_config = [2, 2, 18, 2]
+        self.tf_emb = 96
+        self.tf = SwinTransformerV2(img_size=input_resolution, in_chans=planes, embed_dim=self.tf_emb, window_size=window_size, depths=self.tf_config)
+        self.tf.load_state_dict(torch.load('./weights/swinv2_pretrain_w78.pth', map_location='cpu'))
+        self.reproj = nn.ModuleList([nn.Conv2d(96 * 2**i, planes * 2**i,kernel_size=1, stride=1, padding=1) for i in range(len(self.tf_config))])
+        self.layer5 = self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
+
+        # P Branch
+        self.compression3 = nn.Sequential(
+                                          nn.Conv2d(planes * 4, planes * 2, kernel_size=1, bias=False),
+                                          BatchNorm2d(planes * 2, momentum=bn_mom),
+                                          )
+
+        self.compression4 = nn.Sequential(
+                                          nn.Conv2d(planes * 8, planes * 2, kernel_size=1, bias=False),
+                                          BatchNorm2d(planes * 2, momentum=bn_mom),
+                                          )
+        self.pag3 = PagFM(planes * 2, planes)
+        self.pag4 = PagFM(planes * 2, planes)
+
+        self.layer3_ = self._make_layer(BasicBlock, planes * 2, planes * 2, m)
+        self.layer4_ = self._make_layer(BasicBlock, planes * 2, planes * 2, m)
+        self.layer5_ = self._make_layer(Bottleneck, planes * 2, planes * 2, 1)
+        
+        # D Branch
+        if m == 2:
+            self.layer3_d = self._make_single_layer(BasicBlock, planes * 2, planes)
+            self.layer4_d = self._make_layer(Bottleneck, planes, planes, 1)
+            self.diff3 = nn.Sequential(
+                                        nn.Conv2d(planes * 4, planes, kernel_size=3, padding=1, bias=False),
+                                        BatchNorm2d(planes, momentum=bn_mom),
+                                        )
+            self.diff4 = nn.Sequential(
+                                     nn.Conv2d(planes * 8, planes * 2, kernel_size=3, padding=1, bias=False),
+                                     BatchNorm2d(planes * 2, momentum=bn_mom),
+                                     )
+            self.spp = PAPPM(planes * 16, ppm_planes, planes * 4)
+            self.dfm = Light_Bag(planes * 4, planes * 4)
+        else:
+            self.layer3_d = self._make_single_layer(BasicBlock, planes * 2, planes * 2)
+            self.layer4_d = self._make_single_layer(BasicBlock, planes * 2, planes * 2)
+            self.diff3 = nn.Sequential(
+                                        nn.Conv2d(planes * 4, planes * 2, kernel_size=3, padding=1, bias=False),
+                                        BatchNorm2d(planes * 2, momentum=bn_mom),
+                                        )
+            self.diff4 = nn.Sequential(
+                                     nn.Conv2d(planes * 8, planes * 2, kernel_size=3, padding=1, bias=False),
+                                     BatchNorm2d(planes * 2, momentum=bn_mom),
+                                     )
+            self.spp = DAPPM(planes * 16, ppm_planes, planes * 4)
+            self.dfm = Bag(planes * 4, planes * 4)
+            
+        self.layer5_d = self._make_layer(Bottleneck, planes * 2, planes * 2, 1)
+        
+        # Prediction Head
+        if self.augment:
+            self.seghead_p = segmenthead(planes * 2, head_planes, num_classes)
+            self.seghead_d = segmenthead(planes * 2, planes, 1)           
+
+        self.final_layer = segmenthead(planes * 4, head_planes, num_classes)
 
 
-class SwinTransformerV2(nn.Module):
-    """
-    This class implements the Swin Transformer without classification head.
-    """
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
-    def __init__(self,
-                 in_channels: int,
-                 embedding_channels: int,
-                 depths: Tuple[int, ...],
-                 input_resolution: Tuple[int, int],
-                 number_of_heads: Tuple[int, ...],
-                 window_size: int = 7,
-                 patch_size: int = 4,
-                 ff_feature_ratio: int = 4,
-                 dropout: float = 0.0,
-                 dropout_attention: float = 0.0,
-                 dropout_path: float = 0.2,
-                 use_checkpoint: bool = False,
-                 sequential_self_attention: bool = False,
-                 use_deformable_block: bool = False) -> None:
+ 
+    def _make_layer(self, block, inplanes, planes, blocks, stride=1):
+        downsample = None
+        if stride != 1 or inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion, momentum=bn_mom),
+            )
+
+        layers = []
+        layers.append(block(inplanes, planes, stride, downsample))
+        inplanes = planes * block.expansion
+        for i in range(1, blocks):
+            if i == (blocks-1):
+                layers.append(block(inplanes, planes, stride=1, no_relu=True))
+            else:
+                layers.append(block(inplanes, planes, stride=1, no_relu=False))
+
+        return nn.Sequential(*layers)
+    
+    def _make_single_layer(self, block, inplanes, planes, stride=1):
+        downsample = None
+        if stride != 1 or inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(inplanes, planes * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(planes * block.expansion, momentum=bn_mom),
+            )
+
+        layer = block(inplanes, planes, stride, downsample, no_relu=True)
+        
+        return layer
+    
+    def imgnet_pretrain(self, path):
+        try:
+            pretrained_state = torch.load(path, map_location='cpu')['state_dict']
+        except:
+            pretrained_state = torch.load(path, map_location='cpu')['model_state_dict']
+        model_dict = self.state_dict()
+        pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
+        model_dict.update(pretrained_state)
+        msg = 'PIDnet: Loaded {} parameters!'.format(len(pretrained_state))
+        self.load_state_dict(model_dict, strict = False)
+        print(msg)
+
+    def find_mode(self, img):
         """
-        Constructor method
-        :param in_channels: (int) Number of input channels
-        :param depth: (int) Depth of the stage (number of layers)
-        :param downscale: (bool) If true input is downsampled (see Fig. 3 or V1 paper)
-        :param input_resolution: (Tuple[int, int]) Input resolution
-        :param number_of_heads: (int) Number of attention heads to be utilized
-        :param window_size: (int) Window size to be utilized
-        :param shift_size: (int) Shifting size to be used
-        :param ff_feature_ratio: (int) Ratio of the hidden dimension in the FFN to the input channels
-        :param dropout: (float) Dropout in input mapping
-        :param dropout_attention: (float) Dropout rate of attention map
-        :param dropout_path: (float) Dropout in main path
-        :param use_checkpoint: (bool) If true checkpointing is utilized
-        :param sequential_self_attention: (bool) If true sequential self-attention is performed
-        :param use_deformable_block: (bool) If true deformable block is used
+        returns 0 if rgb and 1 if ir
         """
-        # Call super constructor
-        super(SwinTransformerV2, self).__init__()
-        # Save parameters
-        self.patch_size: int = patch_size
-        # Init patch embedding
-        self.patch_embedding: nn.Module = PatchEmbedding(in_channels=in_channels, out_channels=embedding_channels,
-                                                         patch_size=patch_size)
-        # Compute patch resolution
-        patch_resolution: Tuple[int, int] = (input_resolution[0] // patch_size, input_resolution[1] // patch_size)
-        # Path dropout dependent on depth
-        dropout_path = torch.linspace(0., dropout_path, sum(depths)).tolist()
-        # Init stages
-        self.stages: nn.ModuleList = nn.ModuleList()
-        for index, (depth, number_of_head) in enumerate(zip(depths, number_of_heads)):
-            self.stages.append(
-                SwinTransformerStage(
-                    in_channels=embedding_channels * (2 ** max(index - 1, 0)),
-                    depth=depth,
-                    downscale=not (index == 0),
-                    input_resolution=(patch_resolution[0] // (2 ** max(index - 1, 0)),
-                                      patch_resolution[1] // (2 ** max(index - 1, 0))),
-                    number_of_heads=number_of_head,
-                    window_size=window_size,
-                    ff_feature_ratio=ff_feature_ratio,
-                    dropout=dropout,
-                    dropout_attention=dropout_attention,
-                    dropout_path=dropout_path[sum(depths[:index]):sum(depths[:index + 1])],
-                    use_checkpoint=use_checkpoint,
-                    sequential_self_attention=sequential_self_attention,
-                    use_deformable_block=use_deformable_block and (index > 0)
-                ))
+        if(math.isclose(img[1:].sum(), 0, abs_tol=1e-9)):
+            return 1
+        return 0
 
-    def update_resolution(self, new_window_size: int, new_input_resolution: Tuple[int, int]) -> None:
-        """
-        Method updates the window size and so the pair-wise relative positions
-        :param new_window_size: (int) New window size
-        :param new_input_resolution: (Tuple[int, int]) New input resolution
-        """
-        # Compute new patch resolution
-        new_patch_resolution: Tuple[int, int] = (new_input_resolution[0] // self.patch_size,
-                                                 new_input_resolution[1] // self.patch_size)
-        # Update resolution of each stage
-        for index, stage in enumerate(self.stages):  # type: int, SwinTransformerStage
-            stage.update_resolution(new_window_size=new_window_size,
-                                    new_input_resolution=(new_patch_resolution[0] // (2 ** max(index - 1, 0)),
-                                                          new_patch_resolution[1] // (2 ** max(index - 1, 0))))
+    def make_input(self, x):
+        B, N, H, W = x.size()
+        x_new = torch.zeros((B, self.channels, H, W), dtype=x.dtype, device=x.device)
+        for b in range(B):
+            for n in range(N // 3):
+                img = x[b, n*3:(n+1)*3]
+                if self.find_mode(img) == 1:
+                    x_new[b, -1] = img[0] + self.pos_param[n]
+                else:
+                    x_new[b, :3] = img + self.pos_param[n]
+        return x_new
 
-    def forward(self, input: torch.Tensor) -> List[torch.Tensor]:
-        """
-        Forward pass
-        :param input: (torch.Tensor) Input tensor
-        :return: (List[torch.Tensor]) List of features from each stage
-        """
-        # Perform patch embedding
-        output: torch.Tensor = self.patch_embedding(input)
-        # Init list to store feature
-        features: List[torch.Tensor] = []
-        # Forward pass of each stage
-        for stage in self.stages:
-            output: torch.Tensor = stage(output)
-            features.append(output)
-        return features
+    def forward(self, x):
+        x = self.make_input(x)
+        x = self.conv1(x)
+        interfeat = self.tf.forward_intermediates(x, intermediates_only=True)
+        out1, out2, out3, out4 = [self.reproj[i](feat) for i, feat in enumerate(interfeat)]
+        x_ = self.layer3_(out2)
+        x_d = self.layer3_d(out2)
+        
+        width_output = x_d.shape[-1]
+        height_output = x_d.shape[-2]
 
+        x_ = self.pag3(x_, self.compression3(out3))
+        x_d = x_d + F.interpolate(
+                        self.diff3(out3),
+                        size=[height_output, width_output],
+                        mode='bilinear', align_corners=algc)
+        if self.augment:
+            temp_p = x_
+        
+        x_ = self.layer4_(self.relu(x_))
+        x_d = self.layer4_d(self.relu(x_d))
+        
+        x_ = self.pag4(x_, self.compression4(out4))
+        x_d = x_d + F.interpolate(
+                        self.diff4(out4),
+                        size=[height_output, width_output],
+                        mode='bilinear', align_corners=algc)
+        if self.augment:
+            temp_d = x_d
+            
+        x_ = self.layer5_(self.relu(x_))
+        x_d = self.layer5_d(self.relu(x_d))
+        x = F.interpolate(
+                        self.spp(self.layer5(out4)),
+                        size=[height_output, width_output],
+                        mode='bilinear', align_corners=algc)
 
-def swin_transformer_v2_t(input_resolution: Tuple[int, int],
-                          window_size: int = 7,
-                          in_channels: int = 3,
-                          use_checkpoint: bool = False,
-                          sequential_self_attention: bool = False,
-                          **kwargs) -> SwinTransformerV2:
-    """
-    Function returns a tiny Swin Transformer V2 (SwinV2-T: C = 96, layer numbers = {2, 2, 6, 2}) for feature extraction
-    :param input_resolution: (Tuple[int, int]) Input resolution
-    :param window_size: (int) Window size to be utilized
-    :param in_channels: (int) Number of input channels
-    :param use_checkpoint: (bool) If true checkpointing is utilized
-    :param sequential_self_attention: (bool) If true sequential self-attention is performed
-    :return: (SwinTransformerV2) Tiny Swin Transformer V2
-    """
-    return SwinTransformerV2(input_resolution=input_resolution,
-                             window_size=window_size,
-                             in_channels=in_channels,
-                             use_checkpoint=use_checkpoint,
-                             sequential_self_attention=sequential_self_attention,
-                             embedding_channels=96,
-                             depths=(2, 2, 6, 2),
-                             number_of_heads=(3, 6, 12, 24),
-                             **kwargs)
+        x_ = self.final_layer(self.dfm(x_, x, x_d))
 
+        if self.augment: 
+            x_extra_p = self.seghead_p(temp_p)
+            x_extra_d = self.seghead_d(temp_d)
+            return [x_extra_p, x_, x_extra_d]
+        else:
+            return x_
+    
+    def save_model(self, path, epoch):
+        os.makedirs(f'{path}', exist_ok=True)
+        torch.save(self.state_dict(), os.path.join(path, f'Epoch{epoch}.pt'))
 
-def swin_transformer_v2_s(input_resolution: Tuple[int, int],
-                          window_size: int = 7,
-                          in_channels: int = 3,
-                          use_checkpoint: bool = False,
-                          sequential_self_attention: bool = False,
-                          **kwargs) -> SwinTransformerV2:
-    """
-    Function returns a small Swin Transformer V2 (SwinV2-S: C = 96, layer numbers ={2, 2, 18, 2}) for feature extraction
-    :param input_resolution: (Tuple[int, int]) Input resolution
-    :param window_size: (int) Window size to be utilized
-    :param in_channels: (int) Number of input channels
-    :param use_checkpoint: (bool) If true checkpointing is utilized
-    :param sequential_self_attention: (bool) If true sequential self-attention is performed
-    :return: (SwinTransformerV2) Small Swin Transformer V2
-    """
-    return SwinTransformerV2(input_resolution=input_resolution,
-                             window_size=window_size,
-                             in_channels=in_channels,
-                             use_checkpoint=use_checkpoint,
-                             sequential_self_attention=sequential_self_attention,
-                             embedding_channels=96,
-                             depths=(2, 2, 18, 2),
-                             number_of_heads=(3, 6, 12, 24),
-                             **kwargs)
-
-
-def swin_transformer_v2_b(input_resolution: Tuple[int, int],
-                          window_size: int = 7,
-                          in_channels: int = 3,
-                          use_checkpoint: bool = False,
-                          sequential_self_attention: bool = False,
-                          **kwargs) -> SwinTransformerV2:
-    """
-    Function returns a base Swin Transformer V2 (SwinV2-B: C = 128, layer numbers ={2, 2, 18, 2}) for feature extraction
-    :param input_resolution: (Tuple[int, int]) Input resolution
-    :param window_size: (int) Window size to be utilized
-    :param in_channels: (int) Number of input channels
-    :param use_checkpoint: (bool) If true checkpointing is utilized
-    :param sequential_self_attention: (bool) If true sequential self-attention is performed
-    :return: (SwinTransformerV2) Base Swin Transformer V2
-    """
-    return SwinTransformerV2(input_resolution=input_resolution,
-                             window_size=window_size,
-                             in_channels=in_channels,
-                             use_checkpoint=use_checkpoint,
-                             sequential_self_attention=sequential_self_attention,
-                             embedding_channels=128,
-                             depths=(2, 2, 18, 2),
-                             number_of_heads=(4, 8, 16, 32),
-                             **kwargs)
-
-
-def swin_transformer_v2_l(input_resolution: Tuple[int, int],
-                          window_size: int = 7,
-                          in_channels: int = 3,
-                          use_checkpoint: bool = False,
-                          sequential_self_attention: bool = False,
-                          **kwargs) -> SwinTransformerV2:
-    """
-    Function returns a large Swin Transformer V2 (SwinV2-L: C = 192, layer numbers ={2, 2, 18, 2}) for feature extraction
-    :param input_resolution: (Tuple[int, int]) Input resolution
-    :param window_size: (int) Window size to be utilized
-    :param in_channels: (int) Number of input channels
-    :param use_checkpoint: (bool) If true checkpointing is utilized
-    :param sequential_self_attention: (bool) If true sequential self-attention is performed
-    :return: (SwinTransformerV2) Large Swin Transformer V2
-    """
-    return SwinTransformerV2(input_resolution=input_resolution,
-                             window_size=window_size,
-                             in_channels=in_channels,
-                             use_checkpoint=use_checkpoint,
-                             sequential_self_attention=sequential_self_attention,
-                             embedding_channels=192,
-                             depths=(2, 2, 18, 2),
-                             number_of_heads=(6, 12, 24, 48),
-                             **kwargs)
-
-
-def swin_transformer_v2_h(input_resolution: Tuple[int, int],
-                          window_size: int = 7,
-                          in_channels: int = 3,
-                          use_checkpoint: bool = False,
-                          sequential_self_attention: bool = False,
-                          **kwargs) -> SwinTransformerV2:
-    """
-    Function returns a large Swin Transformer V2 (SwinV2-H: C = 352, layer numbers = {2, 2, 18, 2}) for feature extraction
-    :param input_resolution: (Tuple[int, int]) Input resolution
-    :param window_size: (int) Window size to be utilized
-    :param in_channels: (int) Number of input channels
-    :param use_checkpoint: (bool) If true checkpointing is utilized
-    :param sequential_self_attention: (bool) If true sequential self-attention is performed
-    :return: (SwinTransformerV2) Large Swin Transformer V2
-    """
-    return SwinTransformerV2(input_resolution=input_resolution,
-                             window_size=window_size,
-                             in_channels=in_channels,
-                             use_checkpoint=use_checkpoint,
-                             sequential_self_attention=sequential_self_attention,
-                             embedding_channels=352,
-                             depths=(2, 2, 18, 2),
-                             number_of_heads=(11, 22, 44, 88),
-                             **kwargs)
-
-
-def swin_transformer_v2_g(input_resolution: Tuple[int, int],
-                          window_size: int = 7,
-                          in_channels: int = 3,
-                          use_checkpoint: bool = False,
-                          sequential_self_attention: bool = False,
-                          **kwargs) -> SwinTransformerV2:
-    """
-    Function returns a giant Swin Transformer V2 (SwinV2-G: C = 512, layer numbers = {2, 2, 42, 2}) for feature extraction
-    :param input_resolution: (Tuple[int, int]) Input resolution
-    :param window_size: (int) Window size to be utilized
-    :param in_channels: (int) Number of input channels
-    :param use_checkpoint: (bool) If true checkpointing is utilized
-    :param sequential_self_attention: (bool) If true sequential self-attention is performed
-    :return: (SwinTransformerV2) Giant Swin Transformer V2
-    """
-    return SwinTransformerV2(input_resolution=input_resolution,
-                             window_size=window_size,
-                             in_channels=in_channels,
-                             use_checkpoint=use_checkpoint,
-                             sequential_self_attention=sequential_self_attention,
-                             embedding_channels=512,
-                             depths=(2, 2, 42, 2),
-                             number_of_heads=(16, 32, 64, 128),
-                             **kwargs)
-
+from time import time
 if __name__ == '__main__':
-    xinp = torch.rand((1, 3, 254, 254))
-    model = swin_transformer_v2_s([254, 254],
-                          7,
-                          3,
-                          False,
-                          True)
-    print(model(xinp))
+    device = 'cpu'
+    # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
+    # (do not comment all, just the batchnorm following its corresponding conv layer)
+    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, window_size=(7, 8), input_resolution=(448, 512))
+    model.eval()
+    model.to(device)
+    iterations = None
+    input = torch.randn(1, 4, 448, 512).to(device)
+    t0 = time()
+    out = model(input)
+    t1 = time()
+    print(t1 - t0)
