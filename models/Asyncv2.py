@@ -19,12 +19,12 @@ algc = False
 
 class PIDnetTF(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, window_size=8, input_resolution=512, layer5='conv'):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, input_resolution=512, layer5='conv'):
         super(PIDnetTF, self).__init__()
         self.augment = augment
         self.channels = channels
         self.head_dim = head_dim
-        self.window_size = window_size
+        self.window_size = input_resolution // 64
         self.pos_param = nn.Parameter(torch.randn(2 if channels > 3 else 1, 1))
         # I Branch
         self.conv1 =  nn.Sequential(
@@ -279,7 +279,8 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='tf', window_size=7)
+    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='conv', input_resolution=448)
+    summary(model, torch.randn(1, 4, 448, 448), depth=30)
     model.eval()
     model.to(device)
     iterations = None

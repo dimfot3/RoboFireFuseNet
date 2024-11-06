@@ -3,7 +3,7 @@
 PROJECTNAME: 'PIDnetNoSync'
 SESSIONAME: 'FrameApart3'
 DEVICE: 'cpu'
-NUM_WORKERS: 15
+NUM_WORKERS: 8
 ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 12
@@ -12,7 +12,7 @@ WARMUP: 20
 # model
 MODEL: 'async_s'
 NUM_OUTPUTS: 2
-PRETRAINED: 'weights/pretrained_custom_model.pth'
+PRETRAINED: 'weights/async3_state_dict.pth'
 CHECKPOINT: null
 # data
 TRAINSET: 'lists/train_mvseg.txt'
@@ -20,13 +20,13 @@ VALIDSET: 'lists/val_mvseg.txt'
 TESTSET: 'lists/test_mvseg.txt'
 ROOTDATASET: '../Datasets/'
 N_FRAMES: 2
-MAX_FR_APART: 0
+MAX_FR_APART: 3
 NUM_CLASSES: 26
 CLS_NAMES: ['background', 'Car', 'Bus', 'Motorcycle', 'Bicycle', 'Pedestrian', 'Motorcyclist', 'Bicyclist', 'Cart', 'Bench', 'Umbrella', 'Box', 'Pole', 'Street_lamp', 'Traffic_light', 'Traffic_sign', 'Car_stop', 'Color_cone', 'Sky', 'Road', 'Sidewalk', 'Curb', 'Vegetation', 'Terrain', 'Building', 'Ground']
 #['bg', 'smoke', 'fire']
 MODE: 'fusion'
 MULTISCALE: True
-INTERPOLATION: True
+INTERPOLATION: False
 FLIP: True
 BRIGHTNESS: False
 CONTRAST: False

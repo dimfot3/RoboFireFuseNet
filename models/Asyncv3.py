@@ -17,26 +17,26 @@ BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
 algc = False
 
+
 class PIDnetTF(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, window_size=8, input_resolution=(384, 448)):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, input_resolution=(448, 512)):
         super(PIDnetTF, self).__init__()
         self.augment = augment
         self.channels = channels
         self.head_dim = head_dim
-        self.window_size = window_size
+        self.window_size = (int(input_resolution[0] // 64), int(input_resolution[1] // 64))
         self.pos_param = nn.Parameter(torch.randn(2 if channels > 3 else 1, 1))
         # I Branch
-        self.conv1 =  nn.Sequential(
+        self.conv1_pr =  nn.Sequential(
                           nn.Conv2d(channels,planes,kernel_size=1, stride=1),
                       )
 
         self.relu = nn.ReLU(inplace=True)
-        self.tf_config = [2, 2, 18, 2]
+        self.tf_config = [2, 2, 6, 2]
         self.tf_emb = 96
-        self.tf = SwinTransformerV2(img_size=input_resolution, in_chans=planes, embed_dim=self.tf_emb, window_size=window_size, depths=self.tf_config)
-        self.tf.load_state_dict(torch.load('./weights/swinv2_pretrain_w78.pth', map_location='cpu'))
-        self.reproj = nn.ModuleList([nn.Conv2d(96 * 2**i, planes * 2**i,kernel_size=1, stride=1, padding=1) for i in range(len(self.tf_config))])
+        self.tf = SwinTransformerV2(img_size=input_resolution, in_chans=planes, embed_dim=self.tf_emb, window_size=self.window_size, depths=self.tf_config)
+        self.reproj = nn.ModuleList([nn.Conv2d(self.tf_emb * 2**i, planes * 2**i,kernel_size=1, stride=1, padding=1) for i in range(len(self.tf_config))])
         self.layer5 = self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
 
         # P Branch
@@ -135,6 +135,11 @@ class PIDnetTF(nn.Module):
         
         return layer
     
+    # def imgnet_pretrain(self, path_cnn, path_tf):
+    #     pretrained_state_cnn = torch.load(path_cnn, map_location='cpu')['state_dict']
+    #     pretrained_state_tf = torch.load(path_tf, map_location='cpu')
+    #     self.load_state_dict(pretrained_state_cnn, strict=False)
+    #     self.tf.load_state_dict(pretrained_state_tf, strict=False)
     def imgnet_pretrain(self, path):
         try:
             pretrained_state = torch.load(path, map_location='cpu')['state_dict']
@@ -169,7 +174,7 @@ class PIDnetTF(nn.Module):
 
     def forward(self, x):
         x = self.make_input(x)
-        x = self.conv1(x)
+        x = self.conv1_pr(x)
         interfeat = self.tf.forward_intermediates(x, intermediates_only=True)
         out1, out2, out3, out4 = [self.reproj[i](feat) for i, feat in enumerate(interfeat)]
         x_ = self.layer3_(out2)
@@ -222,7 +227,8 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, window_size=(7, 8), input_resolution=(448, 512))
+    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=(448, 512))
+    model.imgnet_pretrain('./weights/async3_state_dict.pth')
     model.eval()
     model.to(device)
     iterations = None
@@ -231,3 +237,5 @@ if __name__ == '__main__':
     out = model(input)
     t1 = time()
     print(t1 - t0)
+    # summary(model, torch.randn(1, 4, 448, 512), depth=48)
+    torch.save({'state_dict': model.state_dict()}, 'async3_state_dict.pth')

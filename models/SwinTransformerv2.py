@@ -902,9 +902,9 @@ class SwinTransformerV2(nn.Module):
 import numpy as np
 if __name__ == '__main__':
 
-    model = timm.create_model('swinv2_small_window8_256', pretrained=True)
+    model = timm.create_model('swinv2_tiny_window8_256', pretrained=True)
     model.set_input_size((448, 512))
-    model2 = SwinTransformerV2(img_size=(448, 512), in_chans=32, window_size=(7, 8), depths=(2, 2, 18, 2))
+    model2 = SwinTransformerV2(img_size=(448, 512), in_chans=32, embed_dim=96, window_size=(7, 8), num_heads=(3, 6, 12, 24), depths=(2, 2, 6, 2))
     model2.load_state_dict_with_logging(model.state_dict(), strict=False)
     torch.save(model2.state_dict(), 'custom_weights.pth')    
-    summary(model2, torch.rand((1, 32, 448, 512)))
+    summary(model2, torch.rand((1, 32, 448, 512)), depth=40)

@@ -8,7 +8,7 @@ from .scheduler import CosineDecay, PolynomialDecayLR
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
-from models.Asyncv2 import PIDnetTF, make_square_input
+from models.Asyncv3 import PIDnetTF
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -209,9 +209,9 @@ def get_model(args):
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=3 if (args['MODE'] != 'fusion') else 4)
     elif 'async_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=args['CROP_SIZE'])
     elif 'async_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4, layer5='conv', input_resolution=args['BASE_SIZE'], window_size=int(args['BASE_SIZE']//64))
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=args['CROP_SIZE'])
     if args['PRETRAINED'] is not None:
         model.imgnet_pretrain(args['PRETRAINED'])
     model.to(device=args['DEVICE'])
