@@ -40,6 +40,13 @@ class PIDnetTF(nn.Module):
         config = [2, 2, 18, 2, 2]
         drop_path_rate = 0.2
         begin = 0
+        self.use_deconv = True
+        self.deconv = nn.ModuleList([nn.ConvTranspose2d(
+            in_channels=32 * (2**i),
+            out_channels=32 * (2**i),
+            kernel_size=(2**(i+1)),
+            stride=(2**(i+1))
+        ) if self.use_deconv else nn.Identity() for i in range(3)])
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config[:-1] if layer5=='conv' else config))]
         self.stage1 = [Rearrange('b c h w -> b h w c'),
                        nn.LayerNorm(planes),] + \
@@ -214,7 +221,7 @@ class PIDnetTF(nn.Module):
         x = self.relu(self.layer3(x))
         x_ = self.pag3(x_, self.compression3(x))
         x_d = x_d + F.interpolate(
-                        self.diff3(x),
+                        self.deconv[0](self.diff3(x)),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
         if self.augment:
@@ -226,7 +233,7 @@ class PIDnetTF(nn.Module):
         
         x_ = self.pag4(x_, self.compression4(x))
         x_d = x_d + F.interpolate(
-                        self.diff4(x),
+                        self.deconv[1](self.diff4(x)),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
         if self.augment:
@@ -235,7 +242,7 @@ class PIDnetTF(nn.Module):
         x_ = self.layer5_(self.relu(x_))
         x_d = self.layer5_d(self.relu(x_d))
         x = F.interpolate(
-                        self.spp(self.layer5(x)),
+                        self.deconv[2](self.spp(self.layer5(x))),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
 
