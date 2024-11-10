@@ -223,11 +223,12 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = model = PIDNet(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4)
+    model = model = PIDNet(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=1)
     model.eval()
     model.to(device)
     iterations = None
-    input = torch.randn(1, 6, 272, 336).to(device)
+    input = torch.randn(1, 3, 272, 336).to(device)
+    input[:, 1:] = 0
     summary(model, input)
     
     

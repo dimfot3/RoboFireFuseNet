@@ -95,12 +95,12 @@ class WildFire(BaseDataset):
         for item in self.img_list:
             folder, item = '/'.join(item.split('/')[:-1]), item.split('/')[-1]
             name = os.path.splitext(os.path.basename(item))[0]
-            id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)])', name)
+            id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)]|(\d{5})[A-Za-z]_XXX)', name)
             labeled_files.append({
                 "folder": folder,
                 "name": name,
                 "prefix": id_finder.group(1),
-                "id": int(id_finder.group(2) or id_finder.group(3)),
+                "id": int(id_finder.group(2) or id_finder.group(3) or id_finder.group(4)),
                 "labeled": True})
         df = pd.DataFrame(labeled_files)
         unique_folders = df['folder'].unique()
@@ -110,9 +110,9 @@ class WildFire(BaseDataset):
             for file_name in all_files:
                 file_name = file_name.replace('_rgb_', '_XXX_').replace('_rgb', '_XXX')
                 name = os.path.splitext(file_name)[0]
-                id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)])', name)
+                id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)]|(\d{5})[A-Za-z]_XXX)', name)
                 prefix = id_finder.group(1)
-                id_value = int(id_finder.group(2) or id_finder.group(3))
+                id_value = int(id_finder.group(2) or id_finder.group(3) or id_finder.group(4))
                 if not (df['name'] == name).any():
                     labeled_files.append({
                         "folder": folder,
@@ -209,6 +209,8 @@ class WildFire(BaseDataset):
             if img.shape[0] == 1:
                 images[i] = np.append(images[i], np.zeros((2, images[i].shape[1], images[i].shape[2])), axis=0)
         images = np.concatenate(images, axis=0)
+        if self.mode != 'fusion':
+            images = images[:3]
         return images.copy(), label.copy(), edge.copy(), [names]
 
     def single_scale_inference(self, config, model, image):
@@ -241,8 +243,8 @@ class WildFire(BaseDataset):
         
 if __name__ == '__main__':
     dataset = WildFire(root='../Datasets/',
-                          list_path='lists/mvseg_test.txt',
-                          num_classes=25,
+                          list_path='lists/test_mfnet.txt',
+                          num_classes=9,
                           multi_scale=False,
                           flip=True,
                           brightness=True,
@@ -255,7 +257,7 @@ if __name__ == '__main__':
                           n_stack=2,
                           frames_appart=4,
                           load_cache=True,
-                          mode='fusion', interpolation=True)
+                          mode='rgb', interpolation=True)
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
         images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
