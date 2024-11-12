@@ -10,9 +10,9 @@ STOPCOUNTER: 12
 VALID_FREQ: 2
 WARMUP: 20
 # model
-MODEL: 'pidnet_s'
+MODEL: 'async_s'
 NUM_OUTPUTS: 2
-PRETRAINED: 'weights/PIDNet_S_ImageNet.pth'
+PRETRAINED: null
 CHECKPOINT: null
 # data
 TRAINSET: 'lists/train_mvseg.txt'

@@ -8,7 +8,7 @@ from .scheduler import CosineDecay, PolynomialDecayLR
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
-from models.Asyncv3 import PIDnetTF
+from models.Asyncv2 import PIDnetTF
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -59,6 +59,7 @@ class Trainer:
         images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
         output = self.model(images)
+        output = output[:-1]
         output_mask = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
@@ -210,9 +211,9 @@ def get_model(args):
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=channels[args['MODE']])
     elif 'async_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['BASE_SIZE'])
     elif 'async_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['BASE_SIZE'])
     if args['PRETRAINED'] is not None:
         model.imgnet_pretrain(args['PRETRAINED'])
     model.to(device=args['DEVICE'])

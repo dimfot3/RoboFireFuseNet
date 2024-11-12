@@ -121,8 +121,10 @@ class TotalLoss:
         self.align_corners = args['ALIGN_CORNERS']
         self.ignore_label = args['IGNORE_LABEL']
         self.t_thresh_bd = args['T_THRESH_BDLOSS']
+        self.n_classes = args['NUM_CLASSES']
         self.bd_weight = args['BD_WEIGHT']
         self.class_weights = args['CLASS_WEIGHTS']
+        self.defuse_weights = [1, 1, 1]
         if args['USE_OHEM']:
             self.sem_criterion = OhemCrossEntropy(args, ignore_label=args['IGNORE_LABEL'],
                                         thres=args['OHEMTHRES'],
@@ -132,8 +134,7 @@ class TotalLoss:
             self.sem_criterion = CrossEntropy(args, ignore_label=args['IGNORE_LABEL'],
                                     weight=args['CLASS_WEIGHTS'])
         self.bd_criterion = BondaryLoss(coeff_bce=self.bd_weight)
-        
-    
+         
     def pixel_acc(self, pred, label):
         """
         Calculates the mean pixel accuracy for valid pixels (non-negative labels) across the batch.
@@ -151,6 +152,137 @@ class TotalLoss:
             acc_per_class[i] = (acc_sum.float() / (pixel_sum.float() + 1e-10)).detach().cpu().numpy()
         acc = np.array([acc, *acc_per_class])
         return acc
+    
+    def compute_Ldc(self, class_centers, rho_1=1):
+        """
+        Compute the Ldc loss function as described in the equation.
+        
+        Args:
+            class_centers: A list of tensors containing the centers of modality-specific and modality-shared features.
+                        The list should contain (rgb_shared_centers, ir_shared_centers, rgb_specific_centers, ir_specific_centers).
+            rho_1: The regularization parameter.
+            
+        Returns:
+            Ldc: The computed loss.
+        """
+        Csh_V = torch.stack(class_centers[0], dim=0)
+        Csh_I = torch.stack(class_centers[1], dim=0)
+        Csp_V = torch.stack(class_centers[2], dim=0)
+        Csp_I = torch.stack(class_centers[3], dim=0)
+        Ldc = 0
+        for p in range(len(Csp_V)):  # Iterate over classes (identity)
+            max_distance_V = torch.norm(Csp_V[p] - Csp_V, p=2, dim=1).max() - torch.norm(Csp_V[p] - Csh_V, p=2, dim=1).min() + rho_1
+            max_distance_V = torch.max(max_distance_V, torch.tensor(0.0))  # Apply max with 0 to ensure non-negative
+            max_distance_I = torch.norm(Csp_I[p] - Csp_I, p=2, dim=1).max() - torch.norm(Csp_I[p] - Csh_I, p=2, dim=1).min() + rho_1
+            max_distance_I = torch.max(max_distance_I, torch.tensor(0.0))  # Apply max with 0 to ensure non-negative
+            Ldc += max_distance_V + max_distance_I
+        return Ldc
+
+    def compute_Lsps(self, class_centers, rho_2):
+        """
+        Compute the Lsps loss function as described in the equation.
+        
+        Args:
+            class_centers: A list of tensors containing the centers of modality-specific features.
+                        The list should contain (rgb_specific_centers, ir_specific_centers).
+            rho_2: The regularization parameter.
+            
+        Returns:
+            Lsps: The computed loss.
+        """
+        rgb_specific_centers = torch.stack(class_centers[0], dim=0)
+        ir_specific_centers = torch.stack(class_centers[1], dim=0)
+        Lsps = 0
+        # For each identity p
+        for p in range(len(rgb_specific_centers)):  # Iterate over classes (identity)
+            # Compute distances for modality V (RGB)
+            distances_V = torch.norm(rgb_specific_centers[p] - rgb_specific_centers, p=2, dim=1)  # pairwise distances
+            mask_V = torch.ones_like(distances_V, dtype=torch.bool)
+            mask_V[p] = False  # Set the self-distance to be excluded
+            
+            # Apply the mask and find the minimum distance
+            min_distance_V = distances_V[mask_V].min()  # Find the minimum distance to other identities
+            Lsps += torch.max(rho_2 - min_distance_V, torch.tensor(0.0))  # Apply the max with 0
+            # Compute distances for modality I (IR)
+            distances_I = torch.norm(ir_specific_centers[p] - ir_specific_centers, p=2, dim=1)  # pairwise distances
+            mask_I = torch.ones_like(distances_I, dtype=torch.bool)
+            mask_I[p] = False  # Set the self-distance to be excluded
+            min_distance_I = distances_I[mask_I].min()  # Find the minimum distance to other identities
+            Lsps += torch.max(rho_2 - min_distance_I, torch.tensor(0.0))  # Apply the max with 0
+        return Lsps
+    
+    def compute_Lshs(self, class_centers, alpha=2, rho_3=0.7):
+        """
+        Compute the Lshs loss function as described in the equation.
+        
+        Args:
+            class_centers: A list of tensors containing the centers of modality-shared features.
+                        The list should contain (rgb_shared_centers, ir_shared_centers).
+            alpha: The weight for the self-distance term.
+            rho_3: The regularization parameter.
+            
+        Returns:
+            Lshs: The computed loss.
+        """
+        rgb_shared_centers = torch.stack(class_centers[0], dim=0)  # shape: (N_classes, C)
+        ir_shared_centers = torch.stack(class_centers[1], dim=0)   # shape: (N_classes, C)
+
+        Lshs = 0
+        # For each identity p
+        for p in range(len(rgb_shared_centers)):  # Iterate over classes (identity)
+            
+            # First term: self-distance (will always be 0 since it's Cpsh,V - Cpsh,V)
+            self_distance_V = torch.norm(rgb_shared_centers[p] - rgb_shared_centers[p], p=2)  # Should be zero
+            self_distance_I = torch.norm(ir_shared_centers[p] - ir_shared_centers[p], p=2)  # Should be zero
+            Lshs += alpha * self_distance_V**2 + alpha * self_distance_I**2  # Weighted self-distance term
+
+            # Compute distances for modality V (RGB)
+            distances_V = torch.norm(rgb_shared_centers[p] - rgb_shared_centers, p=2, dim=1)  # pairwise distances
+            mask_V = torch.ones_like(distances_V, dtype=torch.bool)
+            mask_V[p] = False  # Set the self-distance to be excluded
+            min_distance_V = distances_V[mask_V].min()  # Find the minimum distance to other identities
+            Lshs += torch.max(rho_3 - min_distance_V, torch.tensor(0.0))  # Apply the max with 0
+            
+            # Compute distances for modality I (IR)
+            distances_I = torch.norm(ir_shared_centers[p] - ir_shared_centers, p=2, dim=1)  # pairwise distances
+            mask_I = torch.ones_like(distances_I, dtype=torch.bool)
+            mask_I[p] = False  # Set the self-distance to be excluded
+            min_distance_I = distances_I[mask_I].min()  # Find the minimum distance to other identities
+            Lshs += torch.max(rho_3 - min_distance_I, torch.tensor(0.0))  # Apply the max with 0
+        return Lshs
+
+    def compute_class_centers(self, rgb_shared, ir_shared, rgb_specific, ir_specific, label_mask):
+        """
+        Compute the centers of each class for each of the four feature maps: 
+        RGB shared, IR shared, RGB specific, IR specific.
+        
+        Args:
+        rgb_shared: Tensor of shape (batch_size, height, width, channels) for RGB shared features
+        ir_shared: Tensor of shape (batch_size, height, width, channels) for IR shared features
+        rgb_specific: Tensor of shape (batch_size, height, width, channels) for RGB-specific features
+        ir_specific: Tensor of shape (batch_size, height, width, channels) for IR-specific features
+        label_mask: Tensor of shape (batch_size, height, width) with class labels for each pixel
+        N_classes: Integer, the number of classes in the dataset
+        
+        Returns:
+        class_centers: List of tensors, where each tensor has shape (N_classes, feature_dimension) 
+                    representing the class centers for each feature map.
+        """
+        label_mask = F.interpolate(label_mask.unsqueeze(1).to(torch.float), rgb_shared.shape[-2:], mode='nearest')
+        feature_maps = [rgb_shared, ir_shared, rgb_specific, ir_specific]
+        class_centers = []
+        for fi, feature_map in enumerate(feature_maps):
+            feature_centers = []
+            for class_id in torch.unique(label_mask):
+                if class_id == self.ignore_label: continue
+                class_mask = (label_mask == class_id).float()
+                class_features = feature_map * class_mask
+                class_center = class_features.sum(dim=(0, 2, 3))
+                class_pixel_count = class_mask.sum(dim=(0, 2, 3))
+                class_center /= (class_pixel_count + 1e-6)
+                feature_centers.append(class_center)
+            class_centers.append(feature_centers)
+        return class_centers
 
     def get_loss(self, outputs, labels, bd_gt):
         """
@@ -159,6 +291,15 @@ class TotalLoss:
         :return: the loss, the semantic maps (from both propotion and integral head),
         the avg pixel accuracy and the segmentation and boundary losses.
         """
+        defuse_loss = 0
+        if(len(outputs) > 3):
+            intermed_feat, outputs = outputs[-1],  outputs[:-1]
+            class_centers = self.compute_class_centers(*intermed_feat, labels)
+            l1 = self.compute_Ldc(class_centers, rho_1=1)
+            l2 = self.compute_Lsps(class_centers, rho_2=0.7)
+            l3 = self.compute_Lshs(class_centers, alpha=2, rho_3=0.7)
+            defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3])
+            
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if (ph != h) or (pw != w):
@@ -172,7 +313,7 @@ class TotalLoss:
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
-        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0)
+        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0) + defuse_loss
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 
