@@ -124,7 +124,7 @@ class TotalLoss:
         self.n_classes = args['NUM_CLASSES']
         self.bd_weight = args['BD_WEIGHT']
         self.class_weights = args['CLASS_WEIGHTS']
-        self.defuse_weights = [1, 1, 1]
+        self.defuse_weights = [1, 0.5, 0.5]
         if args['USE_OHEM']:
             self.sem_criterion = OhemCrossEntropy(args, ignore_label=args['IGNORE_LABEL'],
                                         thres=args['OHEMTHRES'],
@@ -155,7 +155,8 @@ class TotalLoss:
     
     def compute_Ldc(self, class_centers, rho_1=1):
         """
-        Compute the Ldc loss function as described in the equation.
+        This pushes the maximum distances between modality shared features furhter than minimum distances between 
+        modality shared and spcecific features for same id.
         
         Args:
             class_centers: A list of tensors containing the centers of modality-specific and modality-shared features.
@@ -172,15 +173,15 @@ class TotalLoss:
         Ldc = 0
         for p in range(len(Csp_V)):  # Iterate over classes (identity)
             max_distance_V = torch.norm(Csp_V[p] - Csp_V, p=2, dim=1).max() - torch.norm(Csp_V[p] - Csh_V, p=2, dim=1).min() + rho_1
-            max_distance_V = torch.max(max_distance_V, torch.tensor(0.0))  # Apply max with 0 to ensure non-negative
+            max_distance_V = torch.max(max_distance_V, torch.tensor(0.0, requires_grad=True))
             max_distance_I = torch.norm(Csp_I[p] - Csp_I, p=2, dim=1).max() - torch.norm(Csp_I[p] - Csh_I, p=2, dim=1).min() + rho_1
-            max_distance_I = torch.max(max_distance_I, torch.tensor(0.0))  # Apply max with 0 to ensure non-negative
+            max_distance_I = torch.max(max_distance_I, torch.tensor(0.0, requires_grad=True))
             Ldc += max_distance_V + max_distance_I
         return Ldc
 
     def compute_Lsps(self, class_centers, rho_2):
         """
-        Compute the Lsps loss function as described in the equation.
+        Pushes away different-id features in modality specific features.
         
         Args:
             class_centers: A list of tensors containing the centers of modality-specific features.
@@ -213,7 +214,7 @@ class TotalLoss:
     
     def compute_Lshs(self, class_centers, alpha=2, rho_3=0.7):
         """
-        Compute the Lshs loss function as described in the equation.
+        Bring closer the features for same id between the modality-share features. Push away modality share features with different id.
         
         Args:
             class_centers: A list of tensors containing the centers of modality-shared features.
@@ -226,27 +227,28 @@ class TotalLoss:
         """
         rgb_shared_centers = torch.stack(class_centers[0], dim=0)  # shape: (N_classes, C)
         ir_shared_centers = torch.stack(class_centers[1], dim=0)   # shape: (N_classes, C)
-
+        total_shared_centers = torch.cat([rgb_shared_centers, ir_shared_centers], dim=0)
         Lshs = 0
         # For each identity p
         for p in range(len(rgb_shared_centers)):  # Iterate over classes (identity)
             
             # First term: self-distance (will always be 0 since it's Cpsh,V - Cpsh,V)
-            self_distance_V = torch.norm(rgb_shared_centers[p] - rgb_shared_centers[p], p=2)  # Should be zero
-            self_distance_I = torch.norm(ir_shared_centers[p] - ir_shared_centers[p], p=2)  # Should be zero
-            Lshs += alpha * self_distance_V**2 + alpha * self_distance_I**2  # Weighted self-distance term
+            self_distance = torch.norm(rgb_shared_centers[p] - ir_shared_centers[p], p=2)  # Should be zero
+            Lshs += alpha * self_distance**2 
 
             # Compute distances for modality V (RGB)
-            distances_V = torch.norm(rgb_shared_centers[p] - rgb_shared_centers, p=2, dim=1)  # pairwise distances
+            distances_V = torch.norm(rgb_shared_centers[p] - total_shared_centers, p=2, dim=1)  # pairwise distances
             mask_V = torch.ones_like(distances_V, dtype=torch.bool)
             mask_V[p] = False  # Set the self-distance to be excluded
+            mask_V[2*p] = False  # Set the self-distance to be excluded
             min_distance_V = distances_V[mask_V].min()  # Find the minimum distance to other identities
             Lshs += torch.max(rho_3 - min_distance_V, torch.tensor(0.0))  # Apply the max with 0
             
             # Compute distances for modality I (IR)
-            distances_I = torch.norm(ir_shared_centers[p] - ir_shared_centers, p=2, dim=1)  # pairwise distances
+            distances_I = torch.norm(ir_shared_centers[p] - total_shared_centers, p=2, dim=1)  # pairwise distances
             mask_I = torch.ones_like(distances_I, dtype=torch.bool)
             mask_I[p] = False  # Set the self-distance to be excluded
+            mask_I[2*p] = False  # Set the self-distance to be excluded
             min_distance_I = distances_I[mask_I].min()  # Find the minimum distance to other identities
             Lshs += torch.max(rho_3 - min_distance_I, torch.tensor(0.0))  # Apply the max with 0
         return Lshs
@@ -273,13 +275,13 @@ class TotalLoss:
         class_centers = []
         for fi, feature_map in enumerate(feature_maps):
             feature_centers = []
+            feature_map_flat = feature_map.view(feature_map.shape[0], feature_map.shape[1], -1)  # (batch_size, channels, height * width)
+            label_mask_flat = label_mask.view(label_mask.shape[0], -1)
             for class_id in torch.unique(label_mask):
                 if class_id == self.ignore_label: continue
-                class_mask = (label_mask == class_id).float()
-                class_features = feature_map * class_mask
-                class_center = class_features.sum(dim=(0, 2, 3))
-                class_pixel_count = class_mask.sum(dim=(0, 2, 3))
-                class_center /= (class_pixel_count + 1e-6)
+                class_features = feature_map_flat * (label_mask_flat == class_id).unsqueeze(1)  # (batch_size, channels, height * width)
+                class_features = class_features.permute(1, 0, 2).reshape(feature_map.shape[1], -1)  # (channels, all_class_pixels)
+                class_center = class_features.median(dim=1).values  # Median over all pixels for each channel
                 feature_centers.append(class_center)
             class_centers.append(feature_centers)
         return class_centers

@@ -43,11 +43,10 @@ class ChannelAttention(nn.Module):
 
 class PIDnetTF(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, input_resolution=512, layer5='conv'):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=512, config=[18, 2], deconv=False):
         super(PIDnetTF, self).__init__()
         self.augment = augment
         self.channels = channels
-        self.head_dim = head_dim
         self.window_size = input_resolution // 64
         self.planes = planes
         # I Branch
@@ -80,36 +79,30 @@ class PIDnetTF(nn.Module):
         self.layer4_ir = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
         self.layer5_ir =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
         self.weight_channels = ChannelAttention(planes * 48, 16)
-        self.relu = nn.ReLU(inplace=True)
-        config = [18, 2, 2]
+        
+        self.config = config
         drop_path_rate = 0.2
         begin = 0
-        self.use_deconv = True
+        self.use_deconv = False
         self.deconv = nn.ModuleList([nn.ConvTranspose2d(
             in_channels=32 * (2**i),
             out_channels=32 * (2**i),
             kernel_size=(2**(i+1)),
             stride=(2**(i+1))
         ) if self.use_deconv else nn.Identity() for i in range(3)])
-        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config[:-1] if layer5=='conv' else config))]
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
         self.stage3 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
                        nn.LayerNorm(8*planes), nn.Linear(8*planes, 4*planes, bias=False),] + \
-                      [Block(4*planes, 4*planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW',input_resolution//8)
+                      [Block(4*planes, 4*planes, 32, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW',input_resolution//8)
                       for i in range(config[0])] + [Rearrange('b h w c-> b c h w')]
         begin += config[0]
         self.stage4 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
                        nn.LayerNorm(16*planes), nn.Linear(16*planes, 8*planes, bias=False),] + \
-                      [Block(8*planes, 8*planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//16)
-                      for i in range(config[1])] + [Rearrange('b h w c-> b c h w')]
-        begin += config[1]
-        if layer5!='conv':
-            self.stage5 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
-                        nn.LayerNorm(32*planes), nn.Linear(32*planes, 16*planes, bias=False),] + \
-                        [Block(16*planes, 16*planes, self.head_dim, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//32)
-                        for i in range(config[2])] + [Rearrange('b h w c-> b c h w')]
+                      [Block(8*planes, 8*planes, 32, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//16)
+                      for i in range(config[1])] + [Rearrange('b h w c-> b c h w')]        
         self.layer3 = nn.Sequential(*self.stage3)
         self.layer4 = nn.Sequential(*self.stage4)
-        self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2) if layer5 =='conv' else nn.Sequential(*self.stage5)
+        self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
       
         # P Branch
         self.compression3 = nn.Sequential(
@@ -248,8 +241,8 @@ class PIDnetTF(nn.Module):
         x_ir = self.layer1_ir(x_ir)
         x_ir = self.relu(self.layer2_ir(self.relu(x_ir)))
         
-        x = torch.cat([x_rgb[:, :self.planes], x_ir[:, :self.planes]], dim=1)   # fused features
-        x_inter = [x_rgb[:, :self.planes], x_ir[:, :self.planes], x_rgb[:, self.planes:], x_ir[:, self.planes:]]
+        x = torch.cat([x_rgb[:, :self.planes], x_ir[:, :self.planes]], dim=1)   # shared features
+        x_inter = [x_rgb[:, :self.planes], x_ir[:, :self.planes], x_rgb[:, self.planes:], x_ir[:, self.planes:]]        # (shared rgb, shared ir, rgb specific, ir specific)
 
         x_rgb = x_rgb[:, self.planes:]
         x_ir = x_ir[:, self.planes:]
@@ -259,7 +252,6 @@ class PIDnetTF(nn.Module):
         
         width_output = x_d.shape[-1]
         height_output = x_d.shape[-2]
-
         x = self.relu(self.layer3(x))
         x_rgb = self.relu(self.layer3_rgb(x_rgb))
         x_ir = self.relu(self.layer3_ir(x_ir))
@@ -290,7 +282,6 @@ class PIDnetTF(nn.Module):
 
         x = self.weight_channels(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
         x = x.view(x.shape[0], 3, x.shape[1] // 3, x.shape[-2], x.shape[-1]).sum(dim=1)
-        
         x = F.interpolate(
                         self.deconv[2](self.spp(x)),
                         size=[height_output, width_output],
@@ -336,7 +327,7 @@ if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, layer5='conv', input_resolution=448, head_dim=64)
+    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=448, config=[6, 12], deconv=False)
     summary(model, torch.randn(1, 4, 448, 448), depth=30)
     model.eval()
     model.to(device)
