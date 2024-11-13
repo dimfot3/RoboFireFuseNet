@@ -58,6 +58,7 @@ class Logger:
             if metrics['val miou'] > self.best_miou:
                 self.best_miou, self.best_epoch = metrics['val miou'], epoch
         metrics['global_step'] = epoch
+        metrics['best MIOU'] = self.best_miou
         self.tensor_log.log(metrics, epoch, scheduler)
         if self.online_log:
             self.wdb_log.log(metrics, epoch, scheduler)
