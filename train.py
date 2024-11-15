@@ -13,13 +13,11 @@ def train(model, train_data, val_data, args, logger):
     for epoch in range(trainer.start_epoch, args['EPOCHS']):
         running_loss, conf_mat = 0, np.zeros((args['NUM_CLASSES'], args['NUM_CLASSES']))
         # train loop
-        for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}'):
+        for batch in tqdm(train_loader, desc=f'Epoch {epoch}'):
             loss, curr_conf_mat = trainer.training_step(batch)
             conf_mat += curr_conf_mat
             running_loss += loss.item() / len(train_loader)
-        # metrics
         metrics = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'])
-        logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=False)
         # validation, saving model and examining stop criterion
         if epoch % args['VALID_FREQ'] == 0:
             val_metrics = valid(trainer, val_data, epoch, args)
@@ -28,6 +26,7 @@ def train(model, train_data, val_data, args, logger):
             trainer.save_checkpoint(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME']), epoch)
             if trainer.stop_sign(metrics): break
         logger.log(metrics, epoch, trainer.scheduler)
+        logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=False)
     print(f"Training Finished! Best Epoch {logger.best_epoch}: MIOU {logger.best_miou}")
     return logger.best_miou
 
