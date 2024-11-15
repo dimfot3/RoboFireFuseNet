@@ -227,7 +227,11 @@ class WildFire(BaseDataset):
         for i in range(preds.shape[0]):
             pred = self.label2color(preds[i])
             label = self.label2color(labels[i])
-            image = (((images[i] * self.std) + self.mean) * 255).astype('int')
+            if images[i][:, :, 1:3].sum() == 0:
+                img = img[:, :, 3:]
+            else:
+                img = img[:, :, 0:3]
+            image = (((img * self.std) + self.mean) * 255).astype('int')
             f, ax = plt.subplots(1, 3, figsize=(10,7))
             titles = ['Image', 'Ground Truth', 'Prediction']
             pics = [image, label, pred]

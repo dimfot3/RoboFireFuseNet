@@ -256,33 +256,35 @@ class TotalLoss:
     def compute_class_centers(self, rgb_shared, ir_shared, rgb_specific, ir_specific, label_mask):
         """
         Compute the centers of each class for each of the four feature maps: 
-        RGB shared, IR shared, RGB specific, IR specific.
+        RGB shared, IR shared, RGB specific, IR specific, based on pairwise distances.
         
         Args:
-        rgb_shared: Tensor of shape (batch_size, height, width, channels) for RGB shared features
-        ir_shared: Tensor of shape (batch_size, height, width, channels) for IR shared features
-        rgb_specific: Tensor of shape (batch_size, height, width, channels) for RGB-specific features
-        ir_specific: Tensor of shape (batch_size, height, width, channels) for IR-specific features
+        rgb_shared: Tensor of shape (batch_size, channels, height, width) for RGB shared features
+        ir_shared: Tensor of shape (batch_size, channels, height, width) for IR shared features
+        rgb_specific: Tensor of shape (batch_size, channels, height, width) for RGB-specific features
+        ir_specific: Tensor of shape (batch_size, channels, height, width) for IR-specific features
         label_mask: Tensor of shape (batch_size, height, width) with class labels for each pixel
-        N_classes: Integer, the number of classes in the dataset
         
         Returns:
-        class_centers: List of tensors, where each tensor has shape (N_classes, feature_dimension) 
+        class_centers: List of tensors, where each tensor has shape (N_classes, channels) 
                     representing the class centers for each feature map.
         """
-        label_mask = F.interpolate(label_mask.unsqueeze(1).to(torch.float), rgb_shared.shape[-2:], mode='nearest')
+        # Ensure the label mask matches the spatial dimensions of the features
+        label_mask = F.interpolate(label_mask.unsqueeze(1).float(), rgb_shared.shape[2:], mode='nearest').squeeze(1)
         feature_maps = [rgb_shared, ir_shared, rgb_specific, ir_specific]
         class_centers = []
-        for fi, feature_map in enumerate(feature_maps):
+        for feature_map in feature_maps:
             feature_centers = []
-            feature_map_flat = feature_map.view(feature_map.shape[0], feature_map.shape[1], -1)  # (batch_size, channels, height * width)
-            label_mask_flat = label_mask.view(label_mask.shape[0], -1)
-            for class_id in torch.unique(label_mask):
-                if class_id == self.ignore_label: continue
-                class_features = feature_map_flat * (label_mask_flat == class_id).unsqueeze(1)  # (batch_size, channels, height * width)
-                class_features = class_features.permute(1, 0, 2).reshape(feature_map.shape[1], -1)  # (channels, all_class_pixels)
-                class_center = class_features.mean(dim=1)  # Median over all pixels for each channel
-                feature_centers.append(class_center)
+            batch_size, channels, height, width = feature_map.shape
+            feature_map = feature_map.permute(0, 2, 3, 1).reshape(-1, channels)  # (B*H*W, C)
+            label_mask_flat = label_mask.view(-1)  # (B*H*W)            
+            for class_id in torch.unique(label_mask_flat):
+                if class_id == self.ignore_label:   continue
+                class_pixels = feature_map[label_mask_flat == class_id]  # (N_pixels, C)
+                # distances = torch.cdist(class_pixels, class_pixels, p=2)
+                # total_distances = distances.sum(dim=1)
+                central_pixel = class_pixels.meadian(dim=0).values #class_pixels[total_distances.argmin()]
+                feature_centers.append(central_pixel)
             class_centers.append(feature_centers)
         return class_centers
 
@@ -300,7 +302,7 @@ class TotalLoss:
             l1 = self.compute_Ldc(class_centers, rho_1=1)
             l2 = self.compute_Lsps(class_centers, rho_2=0.7)
             l3 = self.compute_Lshs(class_centers, alpha=2, rho_3=0.7)
-            defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3]) / outputs[0].shape[0]
+            defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3]) / len(class_centers[0])
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if (ph != h) or (pw != w):
