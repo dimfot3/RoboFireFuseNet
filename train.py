@@ -6,6 +6,7 @@ from utils.tools import *
 from utils.training_tools import *
 from utils.logger import Logger
 
+
 def train(model, train_data, val_data, args, logger):
     train_loader = DataLoader(train_data, batch_size=args['BATCHSIZE'], shuffle=True, num_workers=args['NUM_WORKERS'], prefetch_factor=2, drop_last=True)
     trainer = Trainer(args, model, len(train_data))

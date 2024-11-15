@@ -291,16 +291,12 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         images = batch[0]
         label = batch[1][0].detach().cpu().numpy().astype('uint8')
         outputs = inf_model(images)
-        images = (images[0][-3:].detach().cpu().numpy() * 255).astype('uint8')
-        images = images if images[:2].sum() > 0.2 else np.resize(images[0], (1, images.shape[1], images.shape[2]))
+        images = (images[0].detach().cpu().numpy() * 255).astype('uint8')
+        images = images[:3] if images[1:3].sum() > 0.2 else images[3:]
         outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
         non_bg_idxs = outputs!=0
         non_gt_idxs = label!=0
         outputs = val_data.label2color(outputs)
-        # gt = (val_data.label2color(label)[:, :, ::-1]).astype('uint8')
-        # gt[label == 2, 1:] = 0
-        # gt[label == 1, :2] = 0
-        # gt[label == 1, 2] = 255
         images = np.transpose(images, (1, 2, 0))
         images[non_bg_idxs] = 0.19 * images[non_bg_idxs] + 0.78 * outputs[non_bg_idxs]
         # images[non_gt_idxs] = 0.29 * images[non_gt_idxs] + 0.68 * gt[non_gt_idxs]

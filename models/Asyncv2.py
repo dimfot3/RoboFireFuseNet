@@ -268,7 +268,6 @@ class PIDnetTF(nn.Module):
         x_ir = self.relu(self.layer4_ir(x_ir))
         x_ = self.layer4_(self.relu(x_))
         x_d = self.layer4_d(self.relu(x_d))
-        
         x_ = self.pag4(x_, self.compression4(x))
         x_d = x_d + F.interpolate(
                         self.deconv[1](self.diff4(x)),
@@ -288,9 +287,9 @@ class PIDnetTF(nn.Module):
                         mode='bilinear', align_corners=algc)
 
         x_ = self.final_layer(self.dfm(x_, x, x_d))
-
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
+            
             x_extra_d = self.seghead_d(temp_d)
             return [x_extra_p, x_, x_extra_d, x_inter]
         else:

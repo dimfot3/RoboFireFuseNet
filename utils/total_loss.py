@@ -203,13 +203,13 @@ class TotalLoss:
             
             # Apply the mask and find the minimum distance
             min_distance_V = distances_V[mask_V].min()  # Find the minimum distance to other identities
-            Lsps += torch.max(rho_2 - min_distance_V, torch.tensor(0.0))  # Apply the max with 0
+            Lsps += torch.max(rho_2 - min_distance_V, torch.tensor(0.0, requires_grad=True))  # Apply the max with 0
             # Compute distances for modality I (IR)
             distances_I = torch.norm(ir_specific_centers[p] - ir_specific_centers, p=2, dim=1)  # pairwise distances
             mask_I = torch.ones_like(distances_I, dtype=torch.bool)
             mask_I[p] = False  # Set the self-distance to be excluded
             min_distance_I = distances_I[mask_I].min()  # Find the minimum distance to other identities
-            Lsps += torch.max(rho_2 - min_distance_I, torch.tensor(0.0))  # Apply the max with 0
+            Lsps += torch.max(rho_2 - min_distance_I, torch.tensor(0.0, requires_grad=True))  # Apply the max with 0
         return Lsps
     
     def compute_Lshs(self, class_centers, alpha=2, rho_3=0.7):
@@ -225,8 +225,8 @@ class TotalLoss:
         Returns:
             Lshs: The computed loss.
         """
-        rgb_shared_centers = torch.stack(class_centers[0], dim=0)  # shape: (N_classes, C)
-        ir_shared_centers = torch.stack(class_centers[1], dim=0)   # shape: (N_classes, C)
+        rgb_shared_centers = torch.stack(class_centers[0], dim=0)
+        ir_shared_centers = torch.stack(class_centers[1], dim=0)
         total_shared_centers = torch.cat([rgb_shared_centers, ir_shared_centers], dim=0)
         Lshs = 0
         # For each identity p
@@ -242,7 +242,7 @@ class TotalLoss:
             mask_V[p] = False  # Set the self-distance to be excluded
             mask_V[2*p] = False  # Set the self-distance to be excluded
             min_distance_V = distances_V[mask_V].min()  # Find the minimum distance to other identities
-            Lshs += torch.max(rho_3 - min_distance_V, torch.tensor(0.0))  # Apply the max with 0
+            Lshs += torch.max(rho_3 - min_distance_V, torch.tensor(0.0, requires_grad=True))  # Apply the max with 0
             
             # Compute distances for modality I (IR)
             distances_I = torch.norm(ir_shared_centers[p] - total_shared_centers, p=2, dim=1)  # pairwise distances
@@ -250,7 +250,7 @@ class TotalLoss:
             mask_I[p] = False  # Set the self-distance to be excluded
             mask_I[2*p] = False  # Set the self-distance to be excluded
             min_distance_I = distances_I[mask_I].min()  # Find the minimum distance to other identities
-            Lshs += torch.max(rho_3 - min_distance_I, torch.tensor(0.0))  # Apply the max with 0
+            Lshs += torch.max(rho_3 - min_distance_I, torch.tensor(0.0, requires_grad=True))  # Apply the max with 0
         return Lshs
 
     def compute_class_centers(self, rgb_shared, ir_shared, rgb_specific, ir_specific, label_mask):
@@ -281,7 +281,7 @@ class TotalLoss:
                 if class_id == self.ignore_label: continue
                 class_features = feature_map_flat * (label_mask_flat == class_id).unsqueeze(1)  # (batch_size, channels, height * width)
                 class_features = class_features.permute(1, 0, 2).reshape(feature_map.shape[1], -1)  # (channels, all_class_pixels)
-                class_center = class_features.median(dim=1).values  # Median over all pixels for each channel
+                class_center = class_features.mean(dim=1)  # Median over all pixels for each channel
                 feature_centers.append(class_center)
             class_centers.append(feature_centers)
         return class_centers
@@ -300,8 +300,7 @@ class TotalLoss:
             l1 = self.compute_Ldc(class_centers, rho_1=1)
             l2 = self.compute_Lsps(class_centers, rho_2=0.7)
             l3 = self.compute_Lshs(class_centers, alpha=2, rho_3=0.7)
-            defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3])
-            
+            defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3]) / outputs[0].shape[0]
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if (ph != h) or (pw != w):
@@ -316,6 +315,9 @@ class TotalLoss:
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
         loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0) + defuse_loss
+        if(torch.isnan(loss)):
+            print(outputs)
+            exit()
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 

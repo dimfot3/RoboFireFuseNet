@@ -2,13 +2,13 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 import os
-from .tools import get_confusion_matrix, get_confusion_matrix_instancewise
+from .tools import get_confusion_matrix
 from .total_loss import TotalLoss
 from .scheduler import CosineDecay, PolynomialDecayLR
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
-from models.Asyncv2 import PIDnetTF
+from models.Asyncv2 import PIDnetTF, make_square_input
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -18,7 +18,7 @@ import torchvision.transforms.functional as VF
 class Trainer:
     def __init__(self, args, model, len_data, test=False):
         self.model_name = args['MODEL']
-        self.use_amp = False if args['DEVICE'] == 'cpu' else True
+        self.use_amp = False if args['DEVICE'] == 'cpu' else False
         self.model = model
         self.optimizer = self.get_optimizer(args, self.model)
         self.criterion = self.get_loss_criterion(args)
@@ -144,7 +144,7 @@ class Trainer:
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             self.scaler.load_state_dict(checkpoint['scaler_state_dict'])
-            self.start_epoch = checkpoint['epoch'] - 1
+            self.start_epoch = checkpoint['epoch']
         self.best_metric = checkpoint['best_metric']
         print('Checkpoint loaded!')
 
