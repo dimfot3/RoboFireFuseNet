@@ -123,20 +123,59 @@ class BaseDataset(data.Dataset):
             images, label, edge = self.rand_crop(images, label, edge)
         return images, label, edge
 
-    def change_brightness(self, images):
-        brightness_factor = 0.5 + np.random.rand(1)
-        for i, image in enumerate(images):
-            float_image = image.astype(np.float32)
-            brightened_image = float_image * brightness_factor
-            images[i] = np.clip(brightened_image, 0, 255).astype(np.uint8)
-        return images
+    def day_to_night(self, image):
+        gamma = 1 + 1.5 * np.random.rand()
+        look_up_table = np.array([((i / 255.0) ** gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+        darkened = cv2.LUT(image, look_up_table)
+        
+        tint = np.zeros_like(darkened, dtype=np.float32)
+        tint[..., 0] += 20
+        tinted = cv2.addWeighted(darkened.astype(np.float32), 1.0, tint, 0.1, 0)
 
-    def adjust_contrast(self, images):
-        for i, image in enumerate(images):
-            float_image = image.astype(np.float32)
-            mean = np.mean(float_image, axis=(0, 1), keepdims=True)
-            contrast_image = (float_image - mean) * (np.random.random((1, )) + 0.5) + mean
-            images[i] = np.clip(contrast_image, 0, 255).astype(np.uint8)
+        rows, cols = image.shape[:2]
+        kernel_x = cv2.getGaussianKernel(cols, cols / 2)
+        kernel_y = cv2.getGaussianKernel(rows, rows / 2)
+        mask = kernel_y * kernel_x.T
+        mask = (mask / mask.max())
+        vignette = (tinted * mask[..., np.newaxis]).astype(np.uint8)
+
+        return vignette
+
+    def night_to_day(self, image):
+        # Brighten the image using gamma correction
+        gamma = 1 - 0.5 * np.random.rand()
+        look_up_table = np.array([((i / 255.0) ** gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+        brightened = cv2.LUT(image, look_up_table)
+
+        # Enhance color saturation
+        hsv = cv2.cvtColor(brightened, cv2.COLOR_BGR2HSV)
+        hsv[..., 1] = cv2.add(hsv[..., 1], 50)  # Increase saturation
+        saturated = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+        # Add a warm (yellowish) tint
+        tint = np.zeros_like(saturated, dtype=np.float32)
+        tint[..., 1] += 20  # Add green
+        tint[..., 2] += 40  # Add red
+        warmed = cv2.addWeighted(saturated.astype(np.float32), 1.0, tint, 0.1, 0)
+
+        # Adjust contrast slightly for a daytime look
+        alpha = 1.2  # Contrast control
+        beta = 20    # Brightness control
+        adjusted = cv2.convertScaleAbs(warmed, alpha=alpha, beta=beta)
+
+        return adjusted
+
+    def is_night_based_on_brightness(self, image, threshold=80):
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        mean_brightness = np.mean(gray)
+        return mean_brightness < threshold
+
+    def change_brightness(self, images):
+        for i, img in enumerate(images):
+            if (img.shape[-1] == 1) or (img[:, :, 1:].sum() == 0):
+                continue
+            else:
+                images[i] = self.night_to_day(img) if self.is_night_based_on_brightness(img) else self.day_to_night(img)
         return images
 
     def gen_sample(self, images, label,
@@ -151,6 +190,8 @@ class BaseDataset(data.Dataset):
             edge = edge[y_k_size:-y_k_size, x_k_size:-x_k_size]
             edge = np.pad(edge, ((y_k_size,y_k_size),(x_k_size,x_k_size)), mode='constant')
         edge = (cv2.dilate(edge, kernel, iterations=1)>50)*1.0
+        if brightness and (np.random.random() > 0.5):
+            images = self.change_brightness(images)
         if multi_scale:
             rand_scale = 0.5 + random.randint(0, self.scale_factor) / 10.0
             images, label, edge = self.multi_scale_aug(images, label, edge,
@@ -158,10 +199,6 @@ class BaseDataset(data.Dataset):
         else:
             images, label, edge = self.multi_scale_aug(images, label, edge,
                                                 rand_scale=1, rand_crop=True)
-        if brightness and (np.random.random() > 0.85):
-            images = self.change_brightness(images)
-        if contrast and (np.random.random() > 0.85):
-            images = self.adjust_contrast(images)
         images = self.input_transform(images)
         label = self.label_transform(label)
         images = [image.transpose(2, 0, 1) for image in images]

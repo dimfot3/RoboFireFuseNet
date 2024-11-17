@@ -1,7 +1,7 @@
 # corsican params
 # general
 PROJECTNAME: 'AsyncSearchv0'
-SESSIONAME: 'async18_2_mean'
+SESSIONAME: 'async18_2_oldch_softmax'
 DEVICE: 'cuda:0'
 NUM_WORKERS: 8
 ONLINELOG: True
@@ -12,7 +12,7 @@ WARMUP: 20
 # model
 MODEL: 'async_s'
 NUM_OUTPUTS: 2
-PRETRAINED: null
+PRETRAINED: './weights/async_pretrainv0.pt'
 CHECKPOINT: null
 TF_CONFIG: [18, 2]
 DECONV: False
@@ -30,7 +30,7 @@ MODE: 'fusion'
 MULTISCALE: True
 INTERPOLATION: False
 FLIP: True
-BRIGHTNESS: False
+BRIGHTNESS: True
 CONTRAST: False
 ONE_INP_AUG: False           # this is for mid fusion, after attention
 SINGLE_SOURCE_AUG: False
@@ -46,15 +46,15 @@ CLASS_WEIGHTS: [1.42312027, 7.5367994, 9.39792775, 9.69024351, 9.90912422, 10.01
 #[0.21, 0.34, 0.45]
 ALIGN_CORNERS: True
 # loss and optimization
-LR: 0.01
+LR: 0.001
 BATCHSIZE: 5
 EPOCHS: 500
 OPTIM: 'ADAM'
 SCHED: 'COS'
-USE_OHEM: False
+USE_OHEM: True
 OHEMTHRES: 0.9
 OHEMKEEP: 131072
-WD: 0.0000012
+WD: 0.00001
 MOMENTUM: 0.9
 NESTEROV: false
 BALANCE_WEIGHTS: [0.4, 1.0]

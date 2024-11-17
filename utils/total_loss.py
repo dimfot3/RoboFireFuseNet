@@ -283,7 +283,7 @@ class TotalLoss:
                 class_pixels = feature_map[label_mask_flat == class_id]  # (N_pixels, C)
                 # distances = torch.cdist(class_pixels, class_pixels, p=2)
                 # total_distances = distances.sum(dim=1)
-                central_pixel = class_pixels.meadian(dim=0).values #class_pixels[total_distances.argmin()]
+                central_pixel = class_pixels.median(dim=0).values #class_pixels[total_distances.argmin()]
                 feature_centers.append(central_pixel)
             class_centers.append(feature_centers)
         return class_centers
@@ -298,11 +298,11 @@ class TotalLoss:
         defuse_loss = 0
         if(len(outputs) > 3):
             intermed_feat, outputs = outputs[-1],  outputs[:-1]
-            class_centers = self.compute_class_centers(*intermed_feat, labels)
-            l1 = self.compute_Ldc(class_centers, rho_1=1)
-            l2 = self.compute_Lsps(class_centers, rho_2=0.7)
-            l3 = self.compute_Lshs(class_centers, alpha=2, rho_3=0.7)
-            defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3]) / len(class_centers[0])
+            # class_centers = self.compute_class_centers(*intermed_feat, labels)
+            # l1 = self.compute_Ldc(class_centers, rho_1=1)
+            # l2 = self.compute_Lsps(class_centers, rho_2=0.7)
+            # l3 = self.compute_Lshs(class_centers, alpha=2, rho_3=0.7)
+            # defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3]) / outputs[1].shape[0]
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if (ph != h) or (pw != w):
@@ -316,10 +316,7 @@ class TotalLoss:
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
-        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0) + defuse_loss
-        if(torch.isnan(loss)):
-            print(outputs)
-            exit()
+        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0)
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 
