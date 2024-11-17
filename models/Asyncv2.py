@@ -19,27 +19,48 @@ algc = False
 
 
 class ChannelAttention(nn.Module):
-    def __init__(self, in_channels, reduction_ratio=16):
+    def __init__(self, in_channels, npaths=2, reduction_ratio=16):
         super(ChannelAttention, self).__init__()
         # Reduce channels to a lower dimension using a reduction ratio, then scale up again
-        reduced_channels = in_channels // reduction_ratio
+        reduced_channels = in_channels*npaths // reduction_ratio
         self.avg_pool = nn.AdaptiveAvgPool2d(1)  # Global average pooling
+        self.npaths = npaths
         self.fc = nn.Sequential(
-            nn.Linear(in_channels, reduced_channels, bias=False),
+            nn.Linear(in_channels*npaths, reduced_channels, bias=False),
             nn.ReLU(inplace=True),
-            nn.Linear(reduced_channels, in_channels, bias=False),
+            nn.Linear(reduced_channels, in_channels*npaths, bias=False),
             nn.Sigmoid()  # To get attention weights in [0, 1]
         )
 
     def forward(self, x):
-        # Step 1: Global average pooling, output shape [batch, channels, 1, 1]
-        avg_out = self.avg_pool(x).view(x.size(0), -1)  # Flatten to [batch, channels]
-        
-        # Step 2: Fully connected layers to learn attention weights
+        b, c, h, w = x.size()
+        avg_out = self.avg_pool(x).view(x.size(0), -1)
         attn_weights = self.fc(avg_out).view(x.size(0), x.size(1), 1, 1)
+        return (x * attn_weights).view(b, self.npaths, c // self.npaths, h, w).sum(1) 
+
+class RelativeChannelAttention(nn.Module):
+    def __init__(self, channels, npaths=2, reduction=16):
+        super(RelativeChannelAttention, self).__init__()
+        # Reduce dimensionality for efficient processing
+        self.gap = nn.AdaptiveAvgPool2d(1)  # Global Avg Pool
+        self.npaths = npaths
+        self.mlp = nn.Sequential(
+            nn.Linear(npaths * channels, (npaths * channels) // reduction, bias=False),
+            nn.ReLU(),
+            nn.Linear((npaths * channels) // reduction, npaths * channels, bias=False)
+        )
+
+    def forward(self, feats):
         
-        # Step 3: Apply channel-wise attention by scaling input
-        return x * attn_weights  # Element-wise multiplication
+        # Global Context Extraction
+        b, c, h, w = feats.size()
+        context = self.gap(feats).view(b, c)  # B x NC
+        # Compute attention weights
+        weights = self.mlp(context)  # B x NC
+        weights = F.softmax(weights.view(b, self.npaths, c // self.npaths), dim=1).view(b, c, 1, 1)  # B x NC
+        feats = feats * weights
+        feats = (feats.view(b, self.npaths, c // self.npaths, h, w)).sum(1)
+        return feats
 
 class PIDnetTF(nn.Module):
 
@@ -72,14 +93,14 @@ class PIDnetTF(nn.Module):
         self.layer2_rgb = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
         self.layer1_ir = self._make_layer(BasicBlock, planes, planes, m)
         self.layer2_ir = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
-        self.layer3_rgb = self._make_layer(BasicBlock, planes, planes * 4, n, stride=2)
+        self.layer3_rgb = self._make_layer(BasicBlock, planes * 2, planes * 4, n, stride=2)
         self.layer4_rgb = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
         self.layer5_rgb =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
-        self.layer3_ir = self._make_layer(BasicBlock, planes, planes * 4, n, stride=2)
+        self.layer3_ir = self._make_layer(BasicBlock, planes * 2, planes * 4, n, stride=2)
         self.layer4_ir = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
         self.layer5_ir =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
-        self.weight_channels = ChannelAttention(planes * 48, 16)
-        
+        self.weight_channels = ChannelAttention(self.planes * 16, 3, 16)
+        self.weight_channels_fus = RelativeChannelAttention(self.planes * 2, 2, 16)
         self.config = config
         drop_path_rate = 0.2
         begin = 0
@@ -201,10 +222,12 @@ class PIDnetTF(nn.Module):
         return layer
     
     def imgnet_pretrain(self, path):
-        try:
-            pretrained_state = torch.load(path, map_location='cpu')['state_dict']
-        except:
-            pretrained_state = torch.load(path, map_location='cpu')['model_state_dict']
+        
+        pretrained_state = torch.load(path, map_location='cpu')
+        if 'state_dict' in pretrained_state.keys():
+            pretrained_state = pretrained_state['state_dict']
+        elif 'model_state_dict' in pretrained_state.keys():
+            pretrained_state = pretrained_state['state_dict']
         model_dict = self.state_dict()
         pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
         model_dict.update(pretrained_state)
@@ -240,12 +263,8 @@ class PIDnetTF(nn.Module):
         x_ir = self.conv1_ir(x[:, -1].unsqueeze(1))
         x_ir = self.layer1_ir(x_ir)
         x_ir = self.relu(self.layer2_ir(self.relu(x_ir)))
-        
-        x = torch.cat([x_rgb[:, :self.planes], x_ir[:, :self.planes]], dim=1)   # shared features
+        x = self.weight_channels_fus(torch.cat((x_rgb, x_ir), dim=1))
         x_inter = [x_rgb[:, :self.planes], x_ir[:, :self.planes], x_rgb[:, self.planes:], x_ir[:, self.planes:]]        # (shared rgb, shared ir, rgb specific, ir specific)
-
-        x_rgb = x_rgb[:, self.planes:]
-        x_ir = x_ir[:, self.planes:]
 
         x_ = self.layer3_(x)
         x_d = self.layer3_d(x)
@@ -280,7 +299,7 @@ class PIDnetTF(nn.Module):
         x_d = self.layer5_d(self.relu(x_d))
 
         x = self.weight_channels(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
-        x = x.view(x.shape[0], 3, x.shape[1] // 3, x.shape[-2], x.shape[-1]).sum(dim=1)
+       
         x = F.interpolate(
                         self.deconv[2](self.spp(x)),
                         size=[height_output, width_output],
@@ -327,6 +346,7 @@ if __name__ == '__main__':
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
     model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=448, config=[6, 12], deconv=False)
+    model.imgnet_pretrain('./weights/async_pretrainv0.pt')
     summary(model, torch.randn(1, 4, 448, 448), depth=30)
     model.eval()
     model.to(device)

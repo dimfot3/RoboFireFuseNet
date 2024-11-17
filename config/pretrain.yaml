@@ -1,57 +1,61 @@
 # corsican params
 # general
-PROJECTNAME: 'Test'
-SESSIONAME: 'Test'
-DEVICE: 'cpu'
-NUM_WORKERS: 15
+PROJECTNAME: 'pretrain'
+SESSIONAME: 'pretrain'
+DEVICE: 'cuda:1'
+NUM_WORKERS: 8
 ONLINELOG: False
 SEED: 200
-STOPCOUNTER: 12
-VALID_FREQ: 15
-WARMUP: 10
+STOPCOUNTER: 400
+VALID_FREQ: 2
+WARMUP: 20
+UPDATE_FREQ: 2
 # model
 MODEL: 'async_s'
 NUM_OUTPUTS: 2
-PRETRAINED: null
+PRETRAINED: './weights/async_pretrainv0.pt'
 CHECKPOINT: null
-UPDATE_FREQ: 5
-TRAINSET: 'lists/mvseg_train.txt'
-VALIDSET: 'lists/mvseg_val.txt'
-TESTSET: 'lists/mvseg_test.txt'
-ROOTDATASET: '../Datasets/FINLAND'
+TF_CONFIG: [18, 2]
+DECONV: False
+# data
+TRAINSET: 'lists/train_mfnet.txt'
+VALIDSET: 'lists/test_mfnet.txt'
+TESTSET: 'lists/test_mfnet.txt'
+ROOTDATASET: '../Datasets/MFnet/'
 N_FRAMES: 2
 MAX_FR_APART: 0
 NUM_CLASSES: 3
-CLS_NAMES: ['background', 'Car', 'Bus', 'Motorcycle', 'Bicycle', 'Pedestrian', 'Motorcyclist', 'Bicyclist', 'Cart', 'Bench', 'Umbrella', 'Box', 'Pole', 'Street_lamp', 'Traffic_light', 'Traffic_sign', 'Car_stop', 'Color_cone', 'Sky', 'Road', 'Sidewalk', 'Curb', 'Vegetation', 'Terrain', 'Building', 'Ground']
+CLS_NAMES: ['unlabeled', 'car', 'person', 'bike', 'curve', 'car stop', 'guardrail', 'color cone', 'bump']
 #['bg', 'smoke', 'fire']
 MODE: 'fusion'
 MULTISCALE: True
+INTERPOLATION: False
 FLIP: True
-BRIGHTNESS: False
+BRIGHTNESS: True
 CONTRAST: False
 ONE_INP_AUG: False           # this is for mid fusion, after attention
 SINGLE_SOURCE_AUG: False
 IGNORE_LABEL: 255
 SCALE_FACTOR: 10
-CROP_SIZE: [448, 512]
-BASE_SIZE: 512
+CROP_SIZE: [640, 640]
+BASE_SIZE: 640
 # CROP_SIZE: [272, 336]
 # BASE_SIZE: 336
 # 0.11, 0.14, 0.75
 # CLASS_WEIGHTS: [0.08500684, 0.06720411, 0.01101274, 0.01511553, 0.01312412, 0.05520766, 0.0060942,  0.00487056, 0.00750978, 0.00095972, 0.00398282, 0.02955925, 0.07257852, 0.06084599, 0.00914129, 0.03644521, 0.02622424, 0.00638211, 0.05866264, 0.06574054, 0.03560546, 0.06574054, 0.08186377, 0.06854771, 0.06955541, 0.04301927]
-CLASS_WEIGHTS: [39.31534571, 12.26980802, 42.18054118, 46.44039747, 42.15347271, 37.82259361, 48.68300575, 48.51023962, 48.83860785, 49.28115286, 48.6147525, 46.51266704, 36.7427391, 45.31953854, 47.76498565, 40.85773736, 45.25310069, 47.60953912, 9.86157348, 4.97322828, 24.06969199, 32.05760907, 4.88157226, 8.83349187, 7.78494492, 6.72750005]
+CLASS_WEIGHTS: [1.42312027, 7.5367994, 9.39792775, 9.69024351, 9.90912422, 10.01344351, 10.37182548, 10.27949471, 10.16517178]
 #[0.21, 0.34, 0.45]
 ALIGN_CORNERS: True
 # loss and optimization
 LR: 0.001
-BATCHSIZE: 8
-EPOCHS: 250
+BATCHSIZE: 5
+EPOCHS: 500
 OPTIM: 'ADAM'
-SCHED: 'POLY'
-USE_OHEM: False
+SCHED: 'COS'
+USE_OHEM: True
 OHEMTHRES: 0.9
 OHEMKEEP: 131072
-WD: 0.0000012
+WD: 0.00001
 MOMENTUM: 0.9
 NESTEROV: false
 BALANCE_WEIGHTS: [0.4, 1.0]
