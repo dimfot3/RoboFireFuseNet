@@ -1,15 +1,15 @@
 # corsican params
 # general
 PROJECTNAME: 'pretrain'
-SESSIONAME: 'pretrain'
-DEVICE: 'cuda:1'
-NUM_WORKERS: 8
+SESSIONAME: 'pretrainv1'
+DEVICE: 'cuda:0'
+NUM_WORKERS: 16
 ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 400
-VALID_FREQ: 2
-WARMUP: 20
-UPDATE_FREQ: 2
+VALID_FREQ: 20
+WARMUP: 5
+UPDATE_FREQ: 8
 # model
 MODEL: 'async_s'
 NUM_OUTPUTS: 2
@@ -21,7 +21,7 @@ DECONV: False
 TRAINSET: 'lists/train_mfnet.txt'
 VALIDSET: 'lists/test_mfnet.txt'
 TESTSET: 'lists/test_mfnet.txt'
-ROOTDATASET: '../Datasets/MFnet/'
+ROOTDATASET: '/media/FastData/nmilitsis/CPP/data/ImageNet/train'
 N_FRAMES: 2
 MAX_FR_APART: 0
 NUM_CLASSES: 3
@@ -37,8 +37,8 @@ ONE_INP_AUG: False           # this is for mid fusion, after attention
 SINGLE_SOURCE_AUG: False
 IGNORE_LABEL: 255
 SCALE_FACTOR: 10
-CROP_SIZE: [640, 640]
-BASE_SIZE: 640
+CROP_SIZE: [320, 320]
+BASE_SIZE: 320
 # CROP_SIZE: [272, 336]
 # BASE_SIZE: 336
 # 0.11, 0.14, 0.75
@@ -48,11 +48,11 @@ CLASS_WEIGHTS: [1.42312027, 7.5367994, 9.39792775, 9.69024351, 9.90912422, 10.01
 ALIGN_CORNERS: True
 # loss and optimization
 LR: 0.001
-BATCHSIZE: 5
-EPOCHS: 500
-OPTIM: 'ADAM'
+BATCHSIZE: 128
+EPOCHS: 200
+OPTIM: 'ADAMW'
 SCHED: 'COS'
-USE_OHEM: True
+USE_OHEM: False
 OHEMTHRES: 0.9
 OHEMKEEP: 131072
 WD: 0.00001

@@ -35,8 +35,8 @@ class Trainer:
            
     def training_step(self, batch):
         self.model.train()
-        images, labels, mask = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.long, device=self.device)
+        images, labels, mask, edges = batch[0].to(dtype=torch.float, device=self.device), \
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.long, device=self.device), batch[3].to(dtype=torch.float, device=self.device)
         with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=self.use_amp):
             inp_images, rev_pad = make_square_input(images, self.base_size)
             outputs = self.model(inp_images)[:-1]
@@ -46,7 +46,7 @@ class Trainer:
                                     size=[images.shape[-2], images.shape[-1]],
                                     mode='bilinear', align_corners=True)
                 outputs[i] = rev_pad(outputs[i])
-            loss = self.criterion.get_loss(outputs[1], labels, mask)
+            loss = self.criterion.get_loss(outputs, labels, mask, edges)
         loss = loss.mean() / self.update_freq
         self.scaler.scale(loss).backward()
         if (self.iter_counter % self.update_freq) == 0:
@@ -75,6 +75,14 @@ class Trainer:
             optimizer = optim.SGD(model.parameters(), lr=args['LR'], momentum=args['MOMENTUM'], weight_decay=args['WD']) 
         elif args['OPTIM'] == 'ADAM':
             optimizer = optim.Adam(model.parameters(), lr=args['LR'], weight_decay=args['WD'])
+        elif args['OPTIM'] == 'ADAMW':
+            vit_params = [param for name, param in model.named_parameters() if name[:6] in ['layer3', 'layer4']]
+            cnn_params = [param for name, param in model.named_parameters() if name[:6] not in ['layer3', 'layer4']]
+            parameters = [
+                            {"params": vit_params, "weight_decay": args['WD'] * 100, "lr": args['LR']},
+                            {"params": cnn_params, "weight_decay": args['WD'], "lr": args['LR']}
+                         ]
+            optimizer = optim.AdamW(parameters, lr=args['LR'], weight_decay=args['WD'])
         else:
             print('Unsupported optimizer.')
             exit()
@@ -135,9 +143,9 @@ def get_model(args):
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=channels[args['MODE']])
     elif 'async_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], deconv=args['DECONV'], input_resolution=args['BASE_SIZE'], config=args['TF_CONFIG'])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], deconv=args['DECONV'], input_resolution=args['CROP_SIZE'], config=args['TF_CONFIG'], window_size=(10, 5))
     elif 'async_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], deconv=args['DECONV'], input_resolution=args['BASE_SIZE'], config=args['TF_CONFIG'])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], deconv=args['DECONV'], input_resolution=args['CROP_SIZE'], config=args['TF_CONFIG'], window_size=(10, 5))
     if args['PRETRAINED'] is not None:
         model.imgnet_pretrain(args['PRETRAINED'])
     model.to(device=args['DEVICE'])

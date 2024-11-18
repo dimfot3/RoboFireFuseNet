@@ -322,10 +322,24 @@ class TotalLoss:
 
 class MaskedMSELoss():
     def __init__(self, args):
-        return
+        self.bd_criterion = BondaryLoss(coeff_bce=1)
+        self.ignore_label = 255
 
-    def get_loss(self, pred, target, mask):
-        loss = ((pred - target) ** 2) * mask
-        loss = loss.reshape(loss.size(0), -1).mean(dim=1)
-        return loss
+    def get_loss(self, outputs, target, mask, edges):
+        h, w = target.size(-2), target.size(-1)
+        ph, pw = outputs[0].size(2), outputs[0].size(3)
+        if (ph != h) or (pw != w):
+            for i in range(len(outputs)):
+                outputs[i] = F.interpolate(outputs[i], size=(
+                    h, w), mode='bilinear', align_corners=self.align_corners)
+        pred = outputs[1]
+        integ_pred = outputs[0]
+        bd_pred = outputs[2]
+        loss_sem = (((pred - target) ** 2) * mask).reshape(-1).mean()
+        loss_int = (((integ_pred - target) ** 2) * mask).reshape(-1).mean()
+        loss_b = (self.bd_criterion(outputs[-1], edges)).reshape(-1).mean()
+        bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>0.8, edges, 0).unsqueeze(1)
+        loss_sb = (((bd_label - bd_pred) ** 2) * ((outputs[-1][:,0,:,:])>0.8) * mask[:, 0, :, :]).reshape(-1).mean()
+        loss = loss_sem + loss_int + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0)
+        return loss.unsqueeze(0)
 

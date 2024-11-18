@@ -13,6 +13,7 @@ import math
 from torchsummary import summary
 import os
 from SwinTransformer import Block, Rearrange
+from math import gcd
 BatchNorm2d = nn.BatchNorm2d
 bn_mom = 0.1
 algc = False
@@ -64,12 +65,13 @@ class RelativeChannelAttention(nn.Module):
 
 class PIDnetTF(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=512, config=[18, 2], deconv=False):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), config=[18, 2], deconv=False):
         super(PIDnetTF, self).__init__()
         self.augment = augment
         self.channels = channels
-        self.window_size = input_resolution // 64
+        self.window_size = window_size
         self.planes = planes
+        input_resolution = np.array(input_resolution)
         # I Branch
         self.conv1_rgb =  nn.Sequential(
                           nn.Conv2d(3,planes,kernel_size=3, stride=2, padding=1),
@@ -112,15 +114,15 @@ class PIDnetTF(nn.Module):
             stride=(2**(i+1))
         ) if self.use_deconv else nn.Identity() for i in range(3)])
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(config))]
-        self.stage3 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
+        self.stage3 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2),      
                        nn.LayerNorm(8*planes), nn.Linear(8*planes, 4*planes, bias=False),] + \
-                      [Block(4*planes, 4*planes, 32, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW',input_resolution//8)
-                      for i in range(config[0])] + [Rearrange('b h w c-> b c h w')]
+                      [Block(4*planes, 4*planes, 32, self.window_size[0], dpr[i+begin], 'W' if not i%2 else 'SW',input_resolution//8)
+                      for i in range(config[0])] + [Rearrange('b h w c-> b c h w')]     # /16
         begin += config[0]
         self.stage4 = [Rearrange('b c h w -> b h w c'), Rearrange('b (h neih) (w neiw) c -> b h w (neiw neih c)', neih=2, neiw=2), 
                        nn.LayerNorm(16*planes), nn.Linear(16*planes, 8*planes, bias=False),] + \
-                      [Block(8*planes, 8*planes, 32, self.window_size, dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//16)
-                      for i in range(config[1])] + [Rearrange('b h w c-> b c h w')]        
+                      [Block(8*planes, 8*planes, 32, self.window_size[1], dpr[i+begin], 'W' if not i%2 else 'SW', input_resolution//16)
+                      for i in range(config[1])] + [Rearrange('b h w c-> b c h w')]         # /32
         self.layer3 = nn.Sequential(*self.stage3)
         self.layer4 = nn.Sequential(*self.stage4)
         self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
@@ -342,18 +344,22 @@ def make_square_input(x, base=512):
 
 from time import time
 if __name__ == '__main__':
-    device = 'cpu'
+    device = 'cuda:0'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=448, config=[6, 12], deconv=False)
+    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=(320, 320), config=[18, 2], window_size=(10, 5), deconv=False)
     model.imgnet_pretrain('./weights/async_pretrainv0.pt')
-    summary(model, torch.randn(1, 4, 448, 448), depth=30)
+    summary(model, torch.randn(1, 4, 320, 320), depth=30)
     model.eval()
     model.to(device)
     iterations = None
-    input = torch.randn(1, 4, 384, 448).to(device)
-    input, reverse = make_square_input(input, 448)
-    t0 = time()
-    out = model(input)
-    t1 = time()
-    print(t1 - t0)
+    for i in range(10):
+        input = torch.randn(1, 4, 256, 256).to(device)
+        t0 = time()
+        input, rev = make_square_input(input, 320)
+        out = model(input)
+        t1 = time()
+        print(t1 - t0)
+        out = F.interpolate(out, (256, 256))
+        print(out.shape, rev(out).shape)
+        

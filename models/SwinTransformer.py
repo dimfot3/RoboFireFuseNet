@@ -39,8 +39,9 @@ class WMSA(nn.Module):
         Returns:
             attn_mask: should be (1 1 w p p),
         """
+        w1, w2 = w
         # supporting sqaure.
-        attn_mask = torch.zeros(w, w, p, p, p, p, dtype=torch.bool, device=self.relative_position_params.device)
+        attn_mask = torch.zeros(w1, w2, p, p, p, p, dtype=torch.bool, device=self.relative_position_params.device)
         if self.type == 'W':
             return attn_mask
 
@@ -65,7 +66,7 @@ class WMSA(nn.Module):
         h_windows = x.size(1)
         w_windows = x.size(2)
         # sqaure validation
-        assert h_windows == w_windows
+        # assert h_windows == w_windows
 
         x = rearrange(x, 'b w1 w2 p1 p2 c -> b (w1 w2) (p1 p2) c', p1=self.window_size, p2=self.window_size)
         qkv = self.embedding_layer(x)
@@ -75,7 +76,7 @@ class WMSA(nn.Module):
         sim = sim + rearrange(self.relative_embedding(), 'h p q -> h 1 1 p q')
         # Using Attn Mask to distinguish different subwindows.
         if self.type != 'W':
-            attn_mask = self.generate_mask(h_windows, self.window_size, shift=self.window_size//2)
+            attn_mask = self.generate_mask((h_windows, w_windows), self.window_size, shift=self.window_size//2)
             sim = sim.masked_fill_(attn_mask, float("-inf"))
 
         probs = nn.functional.softmax(sim, dim=-1)
@@ -102,7 +103,7 @@ class Block(nn.Module):
         self.output_dim = output_dim
         assert type in ['W', 'SW']
         self.type = type
-        if input_resolution <= window_size:
+        if (np.array(input_resolution) <= window_size).any():
             self.type = 'W'
 
         self.ln1 = nn.LayerNorm(input_dim)

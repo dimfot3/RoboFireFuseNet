@@ -25,6 +25,7 @@ class PIDnetTF(nn.Module):
         self.augment = augment
         self.channels = channels
         self.head_dim = head_dim
+        input_resolution = np.array(input_resolution)
         self.window_size = (int(input_resolution[0] // 64), int(input_resolution[1] // 64))
         self.pos_param = nn.Parameter(torch.randn(2 if channels > 3 else 1, 1))
         # I Branch

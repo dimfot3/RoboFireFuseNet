@@ -64,7 +64,7 @@ class CosineDecay:
             (1. + math.cos(math.pi * (self.cur_epoch - self.warmup_epochs) / (self.max_epochs - self.warmup_epochs)))
         self.optimizer.param_groups[0]['lr'] = lr
         if len(self.optimizer.param_groups) == 2:
-            self.optimizer.param_groups[1]['lr'] = lr * self.nbb_mult
+            self.optimizer.param_groups[1]['lr'] = lr # * self.nbb_mult
         return lr
 
     def get_last_lr(self):
