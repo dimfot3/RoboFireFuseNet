@@ -108,6 +108,7 @@ class ImageNet(Dataset):
 
         # Compute edge magnitude
         edges = torch.sqrt(grad_x ** 2 + grad_y ** 2)
+        edges = (edges > edges.quantile(0.95)).float()
         return edges.squeeze()
 
     def __getitem__(self, idx):
@@ -134,12 +135,13 @@ if __name__ == '__main__':
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    dataset = ImageNet('/media/FastData/nmilitsis/CPP/data/ImageNet/train', transform_train)
-    f, ax = plt.subplots(1, 3)
+    dataset = ImageNet('../Datasets/FLAME2', transform_train)
+    f, ax = plt.subplots(1, 4)
     imgs, label, mask, edges = dataset[0]
     img = np.transpose(imgs[:3].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])
     img2 = np.transpose(imgs[-1:].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]).mean() + np.array([0.485, 0.456, 0.406]).mean()
     ax[0].imshow(img)
-    ax[1].imshow(edges)
+    ax[1].imshow(img2)
+    ax[2].imshow(edges)
     ax[-1].imshow(np.transpose(mask.detach().cpu().numpy(), (1, 2, 0)))
     plt.show()
