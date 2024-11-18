@@ -5,7 +5,7 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-
+import torch.nn.functional as F
 
 class ImageNet(Dataset):
     def __init__(self, root_dir, transform=None):
@@ -86,6 +86,30 @@ class ImageNet(Dataset):
         rolled_image = torch.roll(image, shifts=shift_amount, dims=-2)  # Shift along the width (W dimension)
         return rolled_image
 
+    def detect_edges(self, image):
+        # If the image is RGB (3 channels), convert to grayscale
+        if image.size(0) == 3:
+            image = 0.299 * image[0, :, :] + 0.587 * image[1, :, :] + 0.114 * image[2, :, :]
+        
+        # Add batch and channel dimensions for convolution
+        image = image.unsqueeze(0).unsqueeze(0)
+
+        # Define Sobel filters
+        sobel_x = torch.tensor([[-1, 0, 1], 
+                                [-2, 0, 2], 
+                                [-1, 0, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        sobel_y = torch.tensor([[-1, -2, -1], 
+                                [ 0,  0,  0], 
+                                [ 1,  2,  1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+
+        # Convolve the image with Sobel filters
+        grad_x = F.conv2d(image, sobel_x, padding=1)
+        grad_y = F.conv2d(image, sobel_y, padding=1)
+
+        # Compute edge magnitude
+        edges = torch.sqrt(grad_x ** 2 + grad_y ** 2)
+        return edges.squeeze()
+
     def __getitem__(self, idx):
         img_path = self.image_paths[idx]
         image = Image.open(img_path).convert('RGB')
@@ -96,11 +120,12 @@ class ImageNet(Dataset):
         images[1] = self.roll_image(images[1], max_shift=32)
         images[1] = self.random_grayscale(images[1])
         images[1], _ = self.random_black_patches(images[1], patch_size=32, black_fraction=0.3)
+        edges = self.detect_edges(images[0])
         images[0], mask = self.random_black_patches(images[0], patch_size=32, black_fraction=0.5)
         N, C, H, W = images.shape
         images = images.reshape(N * C, H, W)[:-2]
         mask = torch.ones_like(mask) - mask
-        return images, label, mask
+        return images, label, mask, edges
 
 
 if __name__ == '__main__':
@@ -109,12 +134,12 @@ if __name__ == '__main__':
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    dataset = ImageNet('../Datasets/FINLAND', transform_train)
+    dataset = ImageNet('/media/FastData/nmilitsis/CPP/data/ImageNet/train', transform_train)
     f, ax = plt.subplots(1, 3)
-    imgs, label, mask = dataset[0]
+    imgs, label, mask, edges = dataset[0]
     img = np.transpose(imgs[:3].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) + np.array([0.485, 0.456, 0.406])
     img2 = np.transpose(imgs[-1:].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]).mean() + np.array([0.485, 0.456, 0.406]).mean()
     ax[0].imshow(img)
-    ax[1].imshow(img2)
+    ax[1].imshow(edges)
     ax[-1].imshow(np.transpose(mask.detach().cpu().numpy(), (1, 2, 0)))
     plt.show()
