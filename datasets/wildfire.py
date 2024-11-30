@@ -30,7 +30,8 @@ class WildFire(BaseDataset):
                  seed=200,
                  load_cache=True,
                  mode='fusion',
-                 interpolation=False):
+                 interpolation=False,
+                 blend_images_p=0.6):
 
         self.mean = mean
         self.std = std
@@ -84,7 +85,7 @@ class WildFire(BaseDataset):
         self.n_stack = n_stack
         self.frames_appart = frames_appart
         self.seed = seed
-
+        self.blend_images_p = blend_images_p
     
     def read_files(self):
         cache_file_path = os.path.join(self.root, self.list_path + '.cache_df.csv')
@@ -167,7 +168,7 @@ class WildFire(BaseDataset):
     
     def get_async_multi_modal_inputs(self, list_of_imgs):
         modal_file_paths = []
-        start_with = np.random.choice(['rgb', 'ir']) if self.mode == 'fusion' else self.mode
+        start_with = 'rgb' if self.mode == 'fusion' else self.mode
         for i in range(len(list_of_imgs)):
             replacement = start_with if i % 2 == 0 else 'ir' if start_with == 'rgb' else 'rgb'
             modal_file_paths.append(os.path.join(self.root, list_of_imgs[i].replace('XXX', replacement)))
@@ -185,7 +186,7 @@ class WildFire(BaseDataset):
                     existing_files.append(full_path)
         return existing_files, label_path
 
-    def __getitem__(self, index):
+    def get_async_cand(self, index):
         target, cands = self.filter_by_prefix_and_id_range(self.files, index, self.frames_appart)
         list_of_imgs, names = self.pick_target_with_candidates(cands, target)
         images, label = self.get_async_multi_modal_inputs(list_of_imgs)
@@ -194,14 +195,37 @@ class WildFire(BaseDataset):
             with Image.open(path).convert('L' if '_ir' in path else 'RGB') as img:
                 img = np.asarray(img)
                 img = img.reshape(*(img.shape[:2]), -1)
-                loaded_images.append(img)
-        if(len(images)!=self.n_stack):
+                loaded_images.append(img.copy())
+        if(len(images)!=self.n_stack):      # this is used for interpolation method
             loaded_images[0] = loaded_images[0] * 0.5 + loaded_images[1] * 0.5
             loaded_images.pop(1)
             names.pop(1)
         with Image.open(label) as label_img:
-            label = np.asarray(label_img)
-            label = label if len(label.shape) == 2 else self.color2label(label)
+            label = np.asarray(label_img) if np.asarray(label_img).shape[-1] !=4 else np.asarray(label_img.convert('RGB'))
+            label = label.copy() if len(label.shape) == 2 else self.color2label(label).copy()
+        return loaded_images, label, names
+
+    def blend_objects(self, img1_list, mask1, img2_list, mask2):
+        hor_shift, ver_shift = np.random.randint(0, 500), np.random.randint(0, 500)
+        mask1 = np.roll(np.roll(mask1, hor_shift, axis=1), ver_shift, axis=0)
+        for i, img1 in enumerate(img1_list):
+            img1_list[i] = np.roll(np.roll(img1, hor_shift, axis=1), ver_shift, axis=0)
+        obj_ids = np.unique(mask1)
+        obj_ids = obj_ids[obj_ids != 0]
+        if len(obj_ids) == 0:   return img2_list, mask2
+        obj_id = np.random.choice(obj_ids)
+        obj_mask = (mask1 == obj_id)
+        mask2[obj_mask] = mask1[obj_mask]
+        for i, img2 in enumerate(img2_list):
+            img2_list[i][obj_mask] = img1_list[i][obj_mask]
+        return img2_list, mask2
+
+    def __getitem__(self, index):
+        loaded_images, label, names = self.get_async_cand(index)
+        if np.random.rand() < self.blend_images_p:
+            for i in range(3):
+                tmp_img, tmp_label, names = self.get_async_cand(np.random.randint(0, len(self)))
+                loaded_images, label = self.blend_objects(tmp_img, tmp_label, loaded_images, label)
         images, label, edge = self.gen_sample(loaded_images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
                                 edge_size=self.bd_dilate_size, brightness=self.brightness, contrast=self.contrast)
@@ -246,9 +270,9 @@ class WildFire(BaseDataset):
 
         
 if __name__ == '__main__':
-    dataset = WildFire(root='../Datasets/',
-                          list_path='lists/test_mfnet.txt',
-                          num_classes=9,
+    dataset = WildFire(root='Datasets/',
+                          list_path='lists/train_mfnet.txt',
+                          num_classes=3,
                           multi_scale=False,
                           flip=True,
                           brightness=True,
@@ -259,22 +283,24 @@ if __name__ == '__main__':
                           base_size=336,
                           bd_dilate_size=4,
                           n_stack=2,
-                          frames_appart=4,
+                          frames_appart=0,
                           load_cache=True,
-                          mode='rgb', interpolation=True)
+                          mode='fusion', interpolation=True)
     for i in np.random.choice(len(dataset), 3):
         images, label, edge, name = dataset[i]
         images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
         f, ax = plt.subplots(1, len(images) + 2)
-        for i, img in enumerate(images):
-            img = (img * 255).astype('int')
+        for i, img in enumerate(images[0:1]):
+            img = (img * 255).astype('uint8')
             img = np.transpose(img, (1, 2, 0))
             if img[:, :, 1:].sum() == 0:
                 img = img[:, :, 0]
             ax[i].imshow(img)
-        label = dataset.label2color(label).astype('int')
+        label = dataset.label2color(label).astype('uint8')
         edge = edge.astype('int')
         ax[-2].imshow(label)
         ax[-1].imshow(edge)
-        plt.show()
+        plt.imsave('test.png', label)
+        plt.imsave('test2.png', edge)
+        plt.imsave('test3.png', img)
         
