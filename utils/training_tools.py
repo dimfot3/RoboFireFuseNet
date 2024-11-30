@@ -32,7 +32,7 @@ class Trainer:
         self.best_metric = 0
         self.stop_cur_counter = 0
         if args['CHECKPOINT'] != None:
-            self.load_checkpoint(os.path.join(os.path.join('weights', args['PROJECTNAME'], args['SESSIONAME'], args['CHECKPOINT'])), test)
+            self.load_checkpoint(os.path.join(args['CHECKPOINT']), test)
 
     def training_step(self, batch):
         self.model.train()
@@ -59,7 +59,6 @@ class Trainer:
         images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
         output = self.model(images)
-        output = output[:-1]
         output_mask = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
@@ -164,7 +163,8 @@ def get_dataset(args, test=False):
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
                           mode=args['MODE'],
-                          interpolation=args['INTERPOLATION'])
+                          interpolation=args['INTERPOLATION'],
+                          blend_images_p=0.5)
     
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
@@ -181,7 +181,8 @@ def get_dataset(args, test=False):
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
                           mode=args['MODE'],
-                          interpolation=args['INTERPOLATION'])
+                          interpolation=args['INTERPOLATION'],
+                          blend_images_p=0.0)
     if test:
         test_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['TESTSET'],
@@ -198,7 +199,8 @@ def get_dataset(args, test=False):
                           n_stack=args['N_FRAMES'],
                           frames_appart=args['MAX_FR_APART'],
                           mode=args['MODE'],
-                          interpolation=args['INTERPOLATION'])
+                          interpolation=args['INTERPOLATION'],
+                          blend_images_p=0.0)
         return train_dataset, val_dataset, test_dataset
     return train_dataset, val_dataset
 

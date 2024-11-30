@@ -73,23 +73,56 @@ class PIDnetTF(nn.Module):
         self.planes = planes
         input_resolution = np.array(input_resolution)
         # I Branch
-        self.conv1_rgb =  nn.Sequential(
-                          nn.Conv2d(3,planes,kernel_size=3, stride=2, padding=1),
+        self.conv1_rgb_0 =  nn.Sequential(
+                          nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
                           BatchNorm2d(planes, momentum=bn_mom),
                           nn.ReLU(inplace=True),
+                      )
+        self.conv1_rgb_1 =  nn.Sequential(
                           nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
                           BatchNorm2d(planes, momentum=bn_mom),
                           nn.ReLU(inplace=True),
                       )
-        self.conv1_ir =  nn.Sequential(
-                          nn.Conv2d(1,planes,kernel_size=3, stride=2, padding=1),
-                          BatchNorm2d(planes, momentum=bn_mom),
-                          nn.ReLU(inplace=True),
+        self.conv1_rgb_2 =  nn.Sequential(
                           nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
                           BatchNorm2d(planes, momentum=bn_mom),
                           nn.ReLU(inplace=True),
                       )
-
+        self.conv1_ir_0 =  nn.Sequential(
+                          nn.Conv2d(1,planes, kernel_size=3, stride=1, padding=1),
+                          BatchNorm2d(planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.conv1_ir_1 =  nn.Sequential(
+                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                          BatchNorm2d(planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.conv1_ir_2 =  nn.Sequential(
+                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                          BatchNorm2d(planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv0 = nn.Sequential(
+                          nn.Conv2d(2*planes,4*planes,kernel_size=1),
+                          BatchNorm2d(4*planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv1 = nn.Sequential(
+                          nn.Conv2d(2*planes,4*planes,kernel_size=1),
+                          BatchNorm2d(4*planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv2 = nn.Sequential(
+                          nn.Conv2d(2*planes,4*planes,kernel_size=1),
+                          BatchNorm2d(4*planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv3 = nn.Sequential(
+                          nn.Conv2d(4*planes,4*planes,kernel_size=1),
+                          BatchNorm2d(4*planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
         self.relu = nn.ReLU(inplace=True)
         self.layer1_rgb = self._make_layer(BasicBlock, planes, planes, m)
         self.layer2_rgb = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
@@ -229,7 +262,7 @@ class PIDnetTF(nn.Module):
         if 'state_dict' in pretrained_state.keys():
             pretrained_state = pretrained_state['state_dict']
         elif 'model_state_dict' in pretrained_state.keys():
-            pretrained_state = pretrained_state['state_dict']
+            pretrained_state = pretrained_state['model_state_dict']
         model_dict = self.state_dict()
         pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
         model_dict.update(pretrained_state)
@@ -259,12 +292,25 @@ class PIDnetTF(nn.Module):
 
     def forward(self, x):
         x = self.make_input(x)
-        x_rgb = self.conv1_rgb(x[:, :3])
-        x_rgb = self.layer1_rgb(x_rgb)
-        x_rgb = self.relu(self.layer2_rgb(self.relu(x_rgb)))
-        x_ir = self.conv1_ir(x[:, -1].unsqueeze(1))
-        x_ir = self.layer1_ir(x_ir)
-        x_ir = self.relu(self.layer2_ir(self.relu(x_ir)))
+        # layer0 rgb
+        x_rgb_0 = self.conv1_rgb_0(x[:, :3])        #/1
+        x_rgb_1 = self.conv1_rgb_1(x_rgb_0)         #/2
+        x_rgb_2 = self.conv1_rgb_2(x_rgb_1)         #/4
+        # layer1 rgb
+        x_rgb_2 = self.layer1_rgb(x_rgb_2)          #/4
+        # layer2 rgb
+        x_rgb_3 = self.relu(self.layer2_rgb(self.relu(x_rgb_2)))        #/8
+        x_rgb = x_rgb_3
+
+        # layer0 ir
+        x_ir_0 = self.conv1_ir_0(x[:, -1].unsqueeze(1))
+        x_ir_1 = self.conv1_ir_1(x_ir_0)
+        x_ir_2 = self.conv1_ir_2(x_ir_1)
+        # layer1 ir
+        x_ir_2 = self.layer1_ir(x_ir_2)
+        # layer2 ir
+        x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
+        x_ir = x_ir_3
         x = self.weight_channels_fus(torch.cat((x_rgb, x_ir), dim=1))
         x_inter = [x_rgb[:, :self.planes], x_ir[:, :self.planes], x_rgb[:, self.planes:], x_ir[:, self.planes:]]        # (shared rgb, shared ir, rgb specific, ir specific)
 
@@ -301,13 +347,19 @@ class PIDnetTF(nn.Module):
         x_d = self.layer5_d(self.relu(x_d))
 
         x = self.weight_channels(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
-       
+
         x = F.interpolate(
                         self.deconv[2](self.spp(x)),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
 
-        x_ = self.final_layer(self.dfm(x_, x, x_d))
+        x_ = self.dfm(x_, x, x_d)
+        x_ = F.interpolate(x_, size=x_rgb_3.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv3(torch.cat((x_rgb_3, x_ir_3), dim=1))
+        x_ = F.interpolate(x_, size=x_rgb_2.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv2(torch.cat((x_rgb_2, x_ir_2), dim=1))
+        x_ = F.interpolate(x_, size=x_rgb_1.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv1(torch.cat((x_rgb_1, x_ir_1), dim=1))
+        x_ = F.interpolate(x_, size=x_rgb_0.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv0(torch.cat((x_rgb_0, x_ir_0), dim=1))
+        x_ = self.final_layer(x_)
+        
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             
@@ -344,22 +396,23 @@ def make_square_input(x, base=512):
 
 from time import time
 if __name__ == '__main__':
-    device = 'cuda:0'
+    device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=(320, 320), config=[18, 2], window_size=(10, 5), deconv=False)
-    model.imgnet_pretrain('./weights/async_pretrainv0.pt')
-    summary(model, torch.randn(1, 4, 320, 320), depth=30)
+    model = PIDnetTF(m=2, n=3, num_classes=3, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=(320, 320), config=[18, 2], window_size=(10, 5), deconv=False)
+    model.imgnet_pretrain('../weights/async_pretrainv0.pt')
     model.eval()
-    model.to(device)
-    iterations = None
-    for i in range(10):
-        input = torch.randn(1, 4, 256, 256).to(device)
-        t0 = time()
-        input, rev = make_square_input(input, 320)
-        out = model(input)
-        t1 = time()
-        print(t1 - t0)
-        out = F.interpolate(out, (256, 256))
-        print(out.shape, rev(out).shape)
+    summary(model, torch.randn(1, 4, 320, 320), depth=30, device=device)
+    # model.eval()
+    # model.to(device)
+    # iterations = None
+    # for i in range(10):
+    #     input = torch.randn(1, 4, 256, 256).to(device)
+    #     t0 = time()
+    #     input, rev = make_square_input(input, 320)
+    #     out = model(input)
+    #     t1 = time()
+    #     print(t1 - t0)
+    #     out = F.interpolate(out, (256, 256))
+    #     print(out.shape, rev(out).shape)
         

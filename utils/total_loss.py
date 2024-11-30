@@ -2,7 +2,10 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import numpy as np
-
+try:
+    from itertools import  ifilterfalse
+except ImportError: # py3k
+    from itertools import  filterfalse as ifilterfalse
 
 class CrossEntropy(nn.Module):
     def __init__(self, args, ignore_label=-1, weight=None):
@@ -125,6 +128,7 @@ class TotalLoss:
         self.bd_weight = args['BD_WEIGHT']
         self.class_weights = args['CLASS_WEIGHTS']
         self.defuse_weights = [1, 0.5, 0.5]
+        self.miou_ce = NewCE(self.class_weights)
         if args['USE_OHEM']:
             self.sem_criterion = OhemCrossEntropy(args, ignore_label=args['IGNORE_LABEL'],
                                         thres=args['OHEMTHRES'],
@@ -309,14 +313,16 @@ class TotalLoss:
             for i in range(len(outputs)):
                 outputs[i] = F.interpolate(outputs[i], size=(
                     h, w), mode='bilinear', align_corners=self.align_corners)
-
         acc  = self.pixel_acc(outputs[-2], labels)
-        loss_s = self.sem_criterion(outputs[:-1], labels)   # the semantic proportion and integral l0, l2
+        # loss_s = self.sem_criterion(outputs[:-1], labels)
+        loss_s = self.miou_ce.lovasz_softmax_loss(outputs[1], labels, classes='all', per_image=False) + \
+            self.miou_ce.lovasz_softmax_loss(outputs[0], labels, classes='all', per_image=False) 
+        # loss_miou = self.miou_ce.lovasz_softmax_loss(outputs[1], labels, classes='all', per_image=False)
         loss_b = self.bd_criterion(outputs[-1], bd_gt)      # the boundary loss l1
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
-        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0)
+        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0) # + loss_miou
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 
@@ -343,3 +349,111 @@ class MaskedMSELoss():
         loss = loss_sem + loss_int + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0)
         return loss.unsqueeze(0)
 
+
+class NewCE:
+    def __init__(self, cls_weights):
+        self.cls_weights = cls_weights
+
+    def lovasz_softmax_loss(self, outputs, labels, classes='all', per_image=False, ignore=None):
+        """
+        Multi-class Lovasz-Softmax loss
+        probas: [B, C, H, W] Variable, class probabilities at each prediction (between 0 and 1).
+                Interpreted as binary (sigmoid) output with outputs of size [B, H, W].
+        labels: [B, H, W] Tensor, ground truth labels (between 0 and C - 1)
+        classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+        per_image: compute the loss per image instead of per batch
+        ignore: void class labels
+        """
+        probas = F.softmax(outputs, dim=1)
+        if per_image:
+            loss = self.mean(self.lovasz_softmax_flat(*(self.flatten_probas(prob.unsqueeze(0), lab.unsqueeze(0), ignore)), classes=classes)
+                            for prob, lab in zip(probas, labels))
+        else:
+            loss = self.lovasz_softmax_flat(*(self.flatten_probas(probas, labels, ignore)), classes=classes)
+        return loss
+
+
+    def lovasz_softmax_flat(self, probas, labels, classes='all'):
+        """
+        Multi-class Lovasz-Softmax loss
+        probas: [P, C] Variable, class probabilities at each prediction (between 0 and 1)
+        labels: [P] Tensor, ground truth labels (between 0 and C - 1)
+        classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
+        """
+        if probas.numel() == 0:
+            # only void pixels, the gradients should be 0
+            return probas * 0.
+        C = probas.size(1)
+        losses = []
+        class_to_sum = list(range(C)) if classes in ['all', 'present'] else classes
+        for c in class_to_sum:
+            fg = (labels == c).float() # foreground for class c
+            if (classes == 'present' and fg.sum() == 0):
+                continue
+            if C == 1:
+                if len(classes) > 1:
+                    raise ValueError('Sigmoid output possible only with 1 class')
+                class_pred = probas[:, 0]
+            else:
+                class_pred = probas[:, c]
+            errors = (fg - class_pred).abs()
+            errors_sorted, perm = torch.sort(errors, 0, descending=True)
+            fg_sorted = fg[perm]
+            losses.append(torch.dot(errors_sorted, self.lovasz_grad(fg_sorted)) * self.cls_weights[c])
+        return self.mean(losses)
+
+
+    def flatten_probas(self, probas, labels, ignore=None):
+        """
+        Flattens predictions in the batch
+        """
+        if probas.dim() == 3:
+            # assumes output of a sigmoid layer
+            B, H, W = probas.size()
+            probas = probas.view(B, 1, H, W)
+        B, C, H, W = probas.size()
+        probas = probas.permute(0, 2, 3, 1).contiguous().view(-1, C)  # B * H * W, C = P, C
+        labels = labels.view(-1)
+        if ignore is None:
+            return probas, labels
+        valid = (labels != ignore)
+        vprobas = probas[valid.nonzero().squeeze()]
+        vlabels = labels[valid]
+        return vprobas, vlabels
+
+    def isnan(self, x):
+        return x != x
+
+    def mean(self, l, ignore_nan=False, empty=0):
+        """
+        nanmean compatible with generators.
+        """
+        l = iter(l)
+        if ignore_nan:
+            l = ifilterfalse(self.isnan, l)
+        try:
+            n = 1
+            acc = next(l)
+        except StopIteration:
+            if empty == 'raise':
+                raise ValueError('Empty mean')
+            return empty
+        for n, v in enumerate(l, 2):
+            acc += v
+        if n == 1:
+            return acc
+        return acc / n
+    
+    def lovasz_grad(self, gt_sorted):
+        """
+        Computes gradient of the Lovasz extension w.r.t sorted errors
+        See Alg. 1 in paper
+        """
+        p = len(gt_sorted)
+        gts = gt_sorted.sum()
+        intersection = gts - gt_sorted.float().cumsum(0)
+        union = gts + (1 - gt_sorted).float().cumsum(0)
+        jaccard = 1. - intersection / union
+        if p > 1: # cover 1-pixel case
+            jaccard[1:p] = jaccard[1:p] - jaccard[0:-1]
+        return jaccard
