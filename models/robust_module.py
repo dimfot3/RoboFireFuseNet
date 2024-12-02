@@ -62,6 +62,7 @@ class RobustModule(nn.Module):
     def __init__(self, input_size, input_channels):
         super(RobustModule, self).__init__()
         input_resolution = np.array(input_size)
+        self.input_size = input_size
         # I Branch
         self.rgb_conv0 = nn.Conv2d(input_channels, input_channels, kernel_size=1)
         self.ir_conv0 = nn.Conv2d(input_channels, input_channels, kernel_size=1)
@@ -168,11 +169,17 @@ class RobustModule(nn.Module):
         os.makedirs(f'{path}', exist_ok=True)
         torch.save(self.state_dict(), os.path.join(path, f'Epoch{epoch}.pt'))
 
+    def init_transformers(self):
+        configuration = Swinv2Config(image_size = self.input_size, window_size=windows_size, num_channels=3, depths=[2, *depths, 2])
+        tf_model = Swinv2Model.from_pretrained("microsoft/swinv2-tiny-patch4-window8-256", config=configuration, ignore_mismatched_sizes=True)
+        model.stage3.load_state_dict(tf_model.encoder.layers[1].state_dict())
+        model.stage4.load_state_dict(tf_model.encoder.layers[2].state_dict())
+
 from time import time
 if __name__ == '__main__':
     device = 'cpu'
     module = RobustModule((256//8, 256//8), 64)
     rgb, ir = torch.rand((4, 64, 32, 32)), torch.rand((4, 64, 32, 32))
     featss = module(rgb_feat = rgb, ir_feat=ir)
-    print(featss[0].shape, featss[1].shape, featss[2:][0].shape)
+    summary(module, (rgb, ir), depth=30, device=device)
     
