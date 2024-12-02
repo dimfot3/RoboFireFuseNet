@@ -12,34 +12,155 @@ from pidnet_utils import BasicBlock, Bottleneck, segmenthead, DAPPM, PAPPM, PagF
 import math
 from torchsummary import summary
 import os
-from SwinTransformerv2 import SwinTransformerV2
+from transformers import Swinv2Config
+from Swin2 import Swinv2Model, Swinv2Stage, Swinv2PatchMerging, Swinv2Embeddings, LambdaLayer
+from math import gcd
+from einops.layers.torch import Rearrange
 BatchNorm2d = nn.BatchNorm2d
+from pidnet import PIDNet
 bn_mom = 0.1
 algc = False
 
 
+class ChannelAttentionModule(nn.Module):
+    def __init__(self, in_channels, out_channels, reduction=16):
+        super(ChannelAttentionModule, self).__init__()
+        
+        reduced_channels = max(1, in_channels // reduction)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        self.channel_attention = nn.Sequential(
+            nn.Linear(in_channels, reduced_channels),
+            nn.ReLU(inplace=True),                     
+            nn.Linear(reduced_channels, in_channels),  
+            nn.Sigmoid()                               
+        )
+        
+        # Convolution to map to output channels
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=1, bias=False)
+    
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        
+        avg_pooled = self.avg_pool(x).view(b, c) 
+        max_pooled = self.max_pool(x).view(b, c)  
+        
+        avg_weights = self.channel_attention(avg_pooled) 
+        max_weights = self.channel_attention(max_pooled) 
+        
+        channel_weights = (avg_weights + max_weights).view(b, c, 1, 1)  
+        
+        x = x * channel_weights  
+        
+        x = self.conv(x)
+        
+        return x
+
 class PIDnetTF(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, head_dim=32, input_resolution=(448, 512)):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), tf_depths=(2, 6)):
         super(PIDnetTF, self).__init__()
         self.augment = augment
         self.channels = channels
-        self.head_dim = head_dim
+        self.window_size = window_size
+        self.planes = planes
         input_resolution = np.array(input_resolution)
-        self.window_size = (int(input_resolution[0] // 64), int(input_resolution[1] // 64))
-        self.pos_param = nn.Parameter(torch.randn(2 if channels > 3 else 1, 1))
         # I Branch
-        self.conv1_pr =  nn.Sequential(
-                          nn.Conv2d(channels,planes,kernel_size=1, stride=1),
+        self.conv1_rgb_0 =  nn.Sequential(
+                          nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
+                          nn.GroupNorm(8, planes),
+                          nn.ReLU(inplace=True),
                       )
-
+        self.conv1_rgb_1 =  nn.Sequential(
+                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                          nn.GroupNorm(8, planes),
+                          nn.ReLU(inplace=True),
+                      )
+        self.conv1_rgb_2 =  nn.Sequential(
+                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                          BatchNorm2d(planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.conv1_ir_0 =  nn.Sequential(
+                          nn.Conv2d(1,planes, kernel_size=3, stride=1, padding=1),
+                          nn.GroupNorm(8, planes),
+                          nn.ReLU(inplace=True),
+                      )
+        self.conv1_ir_1 =  nn.Sequential(
+                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                          nn.GroupNorm(8, planes),
+                          nn.ReLU(inplace=True),
+                      )
+        self.conv1_ir_2 =  nn.Sequential(
+                          nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                          BatchNorm2d(planes, momentum=bn_mom),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv0 = nn.Sequential(
+                          nn.Conv2d(2*planes,4*planes,kernel_size=1),
+                          nn.GroupNorm(16, 4*planes),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv1 = nn.Sequential(
+                          nn.Conv2d(2*planes,4*planes,kernel_size=1),
+                          nn.GroupNorm(16, 4*planes),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv2 = nn.Sequential(
+                          nn.Conv2d(2*planes,4*planes,kernel_size=1),
+                          nn.GroupNorm(16, 4*planes),
+                          nn.ReLU(inplace=True),
+                      )
+        self.tf_conv3 = nn.Sequential(
+                          nn.Conv2d(4*planes,4*planes,kernel_size=1),
+                          nn.GroupNorm(16, 4*planes),
+                          nn.ReLU(inplace=True),
+                      )
         self.relu = nn.ReLU(inplace=True)
-        self.tf_config = [2, 2, 6, 2]
-        self.tf_emb = 96
-        self.tf = SwinTransformerV2(img_size=input_resolution, in_chans=planes, embed_dim=self.tf_emb, window_size=self.window_size, depths=self.tf_config)
-        self.reproj = nn.ModuleList([nn.Conv2d(self.tf_emb * 2**i, planes * 2**i,kernel_size=1, stride=1, padding=1) for i in range(len(self.tf_config))])
-        self.layer5 = self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
-
+        self.layer1_rgb = self._make_layer(BasicBlock, planes, planes, m)
+        self.layer2_rgb = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
+        self.layer1_ir = self._make_layer(BasicBlock, planes, planes, m)
+        self.layer2_ir = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
+        self.layer3_rgb = self._make_layer(BasicBlock, planes * 2, planes * 4, n, stride=2)
+        self.layer4_rgb = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
+        self.layer5_rgb =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
+        self.layer3_ir = self._make_layer(BasicBlock, planes * 2, planes * 4, n, stride=2)
+        self.layer4_ir = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
+        self.layer5_ir =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
+        self.weight_channels_pre = ChannelAttentionModule(self.planes * 2 * 2, self.planes * 2)
+        self.weight_channels_post = ChannelAttentionModule(3 * self.planes * 16, self.planes * 16, 32)
+        
+        tf_configuration = Swinv2Config(window_size=window_size, image_size=input_resolution, num_channels=self.planes * 2)
+        self.stage3 = Swinv2Stage(
+                    config=tf_configuration,
+                    dim=int(tf_configuration.embed_dim * 2**1),
+                    input_resolution=(tf_configuration.image_size[0] // (2**1), tf_configuration.image_size[1] // (2**1)),
+                    depth=tf_depths[0],
+                    num_heads=tf_configuration.num_heads[1],
+                    drop_path=0.05,
+                    downsample=Swinv2PatchMerging,
+                    pretrained_window_size=tf_configuration.pretrained_window_sizes[1],
+                )
+        self.stage4 = Swinv2Stage(
+                    config=tf_configuration,
+                    dim=int(tf_configuration.embed_dim * 2**2),
+                    input_resolution=(tf_configuration.image_size[0] // (2**2), tf_configuration.image_size[1] // (2**2)),
+                    depth=tf_depths[1],
+                    num_heads=tf_configuration.num_heads[2],
+                    drop_path=0.05,
+                    downsample=Swinv2PatchMerging,
+                    pretrained_window_size=tf_configuration.pretrained_window_sizes[2],
+                )
+        
+        self.layer3 = torch.nn.Sequential(Swinv2Embeddings(Swinv2Config(window_size=window_size[0], num_channels=2*planes, patch_size=1, embed_dim=96 * 2)), \
+                                LambdaLayer(lambda xinp: self.stage3(xinp[0], xinp[1]))
+                                )
+        self.layer3_unpatch = torch.nn.Sequential(LambdaLayer(lambda xinp: Rearrange('b (h w) c-> b c h w', h=xinp[2][-2]).forward(xinp[0])), torch.nn.Conv2d(96 * 4, 4 * planes, kernel_size=1))
+        self.layer4 = torch.nn.Sequential(LambdaLayer(lambda xinp: self.stage4(xinp[0], xinp[2][-2:])), \
+                                LambdaLayer(lambda xinp: Rearrange('b (h w) c-> b c h w', h=xinp[2][-2]).forward(xinp[0])), torch.nn.Conv2d(96 * 8, 8 * planes, kernel_size=1))
+        self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
+      
         # P Branch
         self.compression3 = nn.Sequential(
                                           nn.Conv2d(planes * 4, planes * 2, kernel_size=1, bias=False),
@@ -136,20 +257,17 @@ class PIDnetTF(nn.Module):
         
         return layer
     
-    # def imgnet_pretrain(self, path_cnn, path_tf):
-    #     pretrained_state_cnn = torch.load(path_cnn, map_location='cpu')['state_dict']
-    #     pretrained_state_tf = torch.load(path_tf, map_location='cpu')
-    #     self.load_state_dict(pretrained_state_cnn, strict=False)
-    #     self.tf.load_state_dict(pretrained_state_tf, strict=False)
     def imgnet_pretrain(self, path):
-        try:
-            pretrained_state = torch.load(path, map_location='cpu')['state_dict']
-        except:
-            pretrained_state = torch.load(path, map_location='cpu')['model_state_dict']
+        
+        pretrained_state = torch.load(path, map_location='cpu')
+        if 'state_dict' in pretrained_state.keys():
+            pretrained_state = pretrained_state['state_dict']
+        elif 'model_state_dict' in pretrained_state.keys():
+            pretrained_state = pretrained_state['model_state_dict']
         model_dict = self.state_dict()
         pretrained_state = {k: v for k, v in pretrained_state.items() if (k in model_dict and v.shape == model_dict[k].shape)}
         model_dict.update(pretrained_state)
-        msg = 'PIDnet: Loaded {} parameters!'.format(len(pretrained_state))
+        msg = 'PIDnet: Loaded {}% parameters!'.format(len(pretrained_state)*100/len(model_dict))
         self.load_state_dict(model_dict, strict = False)
         print(msg)
 
@@ -168,36 +286,62 @@ class PIDnetTF(nn.Module):
             for n in range(N // 3):
                 img = x[b, n*3:(n+1)*3]
                 if self.find_mode(img) == 1:
-                    x_new[b, -1] = img[0] + self.pos_param[n]
+                    x_new[b, -1] = img[0] 
                 else:
-                    x_new[b, :3] = img + self.pos_param[n]
+                    x_new[b, :3] = img
         return x_new
 
     def forward(self, x):
         x = self.make_input(x)
-        x = self.conv1_pr(x)
-        interfeat = self.tf.forward_intermediates(x, intermediates_only=True)
-        out1, out2, out3, out4 = [self.reproj[i](feat) for i, feat in enumerate(interfeat)]
-        x_ = self.layer3_(out2)
-        x_d = self.layer3_d(out2)
+        # layer0 rgb
+        x_rgb_0 = self.conv1_rgb_0(x[:, :3])        #/1
+        x_rgb_1 = self.conv1_rgb_1(x_rgb_0)         #/2
+        x_rgb_2 = self.conv1_rgb_2(x_rgb_1)         #/4
+        # layer1 rgb
+        x_rgb_2 = self.layer1_rgb(x_rgb_2)          #/4
+        # layer2 rgb
+        x_rgb_3 = self.relu(self.layer2_rgb(self.relu(x_rgb_2)))        #/8
+        x_rgb = x_rgb_3
+
+        # layer0 ir
+        x_ir_0 = self.conv1_ir_0(x[:, -1].unsqueeze(1))
+        x_ir_1 = self.conv1_ir_1(x_ir_0)
+        x_ir_2 = self.conv1_ir_2(x_ir_1)
+        # layer1 ir
+        x_ir_2 = self.layer1_ir(x_ir_2)
+        # layer2 ir
+        x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
+        x_ir = x_ir_3
+        x = self.weight_channels_pre(torch.cat((x_rgb, x_ir), dim=1))
+        x_inter = [x_rgb[:, :self.planes], x_ir[:, :self.planes], x_rgb[:, self.planes:], x_ir[:, self.planes:]]        # (shared rgb, shared ir, rgb specific, ir specific)
         
+        x_ = self.layer3_(x)
+        x_d = self.layer3_d(x)
         width_output = x_d.shape[-1]
         height_output = x_d.shape[-2]
-
-        x_ = self.pag3(x_, self.compression3(out3))
+        
+        x_patched = self.layer3(x)
+        x = self.layer3_unpatch(x_patched)
+        x_rgb = self.relu(self.layer3_rgb(x_rgb))
+        x_ir = self.relu(self.layer3_ir(x_ir))
+        
+        x_ = self.pag3(x_, self.compression3(x))
+        
         x_d = x_d + F.interpolate(
-                        self.diff3(out3),
+                        self.diff3(x),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
         if self.augment:
             temp_p = x_
         
+        x = self.layer4(x_patched)
+        x_rgb = self.relu(self.layer4_rgb(x_rgb))
+        x_ir = self.relu(self.layer4_ir(x_ir))
         x_ = self.layer4_(self.relu(x_))
         x_d = self.layer4_d(self.relu(x_d))
-        
-        x_ = self.pag4(x_, self.compression4(out4))
+        x_ = self.pag4(x_, self.compression4(x))
         x_d = x_d + F.interpolate(
-                        self.diff4(out4),
+                        self.diff4(x),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
         if self.augment:
@@ -205,17 +349,26 @@ class PIDnetTF(nn.Module):
             
         x_ = self.layer5_(self.relu(x_))
         x_d = self.layer5_d(self.relu(x_d))
+
+        x = self.weight_channels_post(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
+
         x = F.interpolate(
-                        self.spp(self.layer5(out4)),
+                        self.spp(x),
                         size=[height_output, width_output],
                         mode='bilinear', align_corners=algc)
 
-        x_ = self.final_layer(self.dfm(x_, x, x_d))
-
+        x_ = self.dfm(x_, x, x_d)
+        x_ = F.interpolate(x_, size=x_rgb_3.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv3(torch.cat((x_rgb_3, x_ir_3), dim=1))
+        x_ = F.interpolate(x_, size=x_rgb_2.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv2(torch.cat((x_rgb_2, x_ir_2), dim=1))
+        x_ = F.interpolate(x_, size=x_rgb_1.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv1(torch.cat((x_rgb_1, x_ir_1), dim=1))
+        x_ = F.interpolate(x_, size=x_rgb_0.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv0(torch.cat((x_rgb_0, x_ir_0), dim=1))
+        x_ = self.final_layer(x_)
+        
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
+            
             x_extra_d = self.seghead_d(temp_d)
-            return [x_extra_p, x_, x_extra_d]
+            return [x_extra_p, x_, x_extra_d, x_inter]
         else:
             return x_
     
@@ -223,20 +376,89 @@ class PIDnetTF(nn.Module):
         os.makedirs(f'{path}', exist_ok=True)
         torch.save(self.state_dict(), os.path.join(path, f'Epoch{epoch}.pt'))
 
+def make_square_input(x, base=512):
+    H, W = x.shape[-2:]
+    if H > W:
+        H_new = base
+        W_new = int((H_new / H) * W)
+    else:
+        W_new = base
+        H_new = int((W_new / W) * H)
+    x = F.interpolate(x, (H_new, W_new), mode='bilinear', align_corners=algc)
+
+    max_dim = max(H_new, W_new)
+    padding_height = max_dim - H_new
+    padding_width = max_dim - W_new
+    pad_top = padding_height // 2
+    pad_bottom = padding_height - pad_top
+    pad_left = padding_width // 2
+    pad_right = padding_width - pad_left
+    padding = (pad_left, pad_right, pad_top, pad_bottom)
+    x = F.pad(x, padding, "constant", 0)  # Pad with zeros
+    reverse_pad = lambda x: x[:, :, padding[2]:-padding[3] or None, padding[0]:-padding[1] or None]
+    return x, reverse_pad
+
+def custom_pretrained(input_res, num_classes, depths, windows_size):
+    model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths)
+    configuration = Swinv2Config(image_size = input_res, window_size=windows_size, num_channels=3, depths=[2, *depths, 2])
+    tf_model = Swinv2Model.from_pretrained("microsoft/swinv2-tiny-patch4-window8-256", config=configuration, ignore_mismatched_sizes=True)
+    model.stage3.load_state_dict(tf_model.encoder.layers[1].state_dict())
+    model.stage4.load_state_dict(tf_model.encoder.layers[2].state_dict())
+    pid_pretrained = torch.load('./weights/PIDNet_S_ImageNet.pth.tar')['state_dict']
+    model_pid = PIDNet(2, 3, 19, 32, 96, 128, True, 3)
+    model_pid.load_state_dict(pid_pretrained, False)
+    for i in range(3):
+        msg = model.conv1_ir_1[i].load_state_dict(model_pid.conv1[3+i].state_dict(), strict=True)
+        msg = model.conv1_ir_2[i].load_state_dict(model_pid.conv1[3+i].state_dict(), strict=True)
+        msg = model.conv1_rgb_1[i].load_state_dict(model_pid.conv1[3+i].state_dict(), strict=True)
+        msg = model.conv1_rgb_2[i].load_state_dict(model_pid.conv1[3+i].state_dict(), strict=True)
+    msg = model.layer1_ir.load_state_dict(model_pid.layer1.state_dict(), strict=True)
+    msg = model.layer1_rgb.load_state_dict(model_pid.layer1.state_dict(), strict=True)
+    msg = model.layer2_ir.load_state_dict(model_pid.layer2.state_dict(), strict=True)
+    msg = model.layer2_rgb.load_state_dict(model_pid.layer2.state_dict(), strict=True)
+    
+    msg = model.layer3_ir.load_state_dict(model_pid.layer3.state_dict(), strict=True)
+    msg = model.layer3_rgb.load_state_dict(model_pid.layer3.state_dict(), strict=True)
+    msg = model.layer4_ir.load_state_dict(model_pid.layer4.state_dict(), strict=True)
+    msg = model.layer4_rgb.load_state_dict(model_pid.layer4.state_dict(), strict=True)
+    msg = model.layer5_ir.load_state_dict(model_pid.layer5.state_dict(), strict=True)
+    msg = model.layer5_rgb.load_state_dict(model_pid.layer5.state_dict(), strict=True)
+
+    msg = model.layer3_.load_state_dict(model_pid.layer3_.state_dict(), strict=True)
+    msg = model.layer3_d.load_state_dict(model_pid.layer3_d.state_dict(), strict=True)
+    msg = model.layer4_.load_state_dict(model_pid.layer4_.state_dict(), strict=True)
+    msg = model.layer4_d.load_state_dict(model_pid.layer4_d.state_dict(), strict=True)
+    msg = model.layer5_.load_state_dict(model_pid.layer5_.state_dict(), strict=True)
+    msg = model.layer5_d.load_state_dict(model_pid.layer5_d.state_dict(), strict=True)
+    msg = model.compression3.load_state_dict(model_pid.compression3.state_dict(), strict=True)
+    msg = model.compression4.load_state_dict(model_pid.compression4.state_dict(), strict=True)
+    msg = model.seghead_d.load_state_dict(model_pid.seghead_d.state_dict(), strict=True)
+    msg = model.pag3.load_state_dict(model_pid.pag3.state_dict(), strict=True)
+    msg = model.pag4.load_state_dict(model_pid.pag4.state_dict(), strict=True)
+    msg = model.diff3.load_state_dict(model_pid.diff3.state_dict(), strict=True)
+    msg = model.diff4.load_state_dict(model_pid.diff4.state_dict(), strict=True)
+    torch.save(model.state_dict(), 'pretrained_480x640_w8_2_6.pth')
+    return model
+    
+    
+
 from time import time
 if __name__ == '__main__':
     device = 'cpu'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
-    model = PIDnetTF(m=2, n=3, num_classes=2, planes=32, ppm_planes=96, head_planes=128, augment=False, channels=4, input_resolution=(448, 512))
-    model.imgnet_pretrain('./weights/async3_state_dict.pth')
-    model.eval()
-    model.to(device)
-    iterations = None
-    input = torch.randn(1, 4, 448, 512).to(device)
-    t0 = time()
-    out = model(input)
-    t1 = time()
-    print(t1 - t0)
-    # summary(model, torch.randn(1, 4, 448, 512), depth=48)
-    torch.save({'state_dict': model.state_dict()}, 'async3_state_dict.pth')
+    windows_size = 8
+    input_res = (480, 640)
+    num_classes = 9
+    depths= [2, 6]
+    model = custom_pretrained(input_res, num_classes, depths, windows_size).cuda().eval()
+    # summary(model, torch.randn(1, 4, *input_res), depth=30, device=device)
+    avg = 0
+    for i in range(100):
+        t0 = time()
+        tmp = model(torch.randn(1, 4, *input_res).cuda())
+        t1 = time()
+        if i > 20:
+            avg += (t1 - t0)/ 80
+        del(tmp)
+    print(avg)
