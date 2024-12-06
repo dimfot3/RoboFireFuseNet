@@ -278,30 +278,8 @@ class PIDnetTF(nn.Module):
         self.load_state_dict(model_dict, strict = False)
         print(msg)
 
-    def find_mode(self, img):
-        """
-        returns 0 if rgb and 1 if ir
-        """
-        if(math.isclose(img[1:].sum(), 0, abs_tol=1e-9)):
-            return 1
-        return 0
-
-    def make_input(self, x):
-        B, N, H, W = x.size()
-        x_new = torch.zeros((B, self.channels, H, W), dtype=x.dtype, device=x.device)
-        for b in range(B):
-            for n in range(N // 3):
-                img = x[b, n*3:(n+1)*3]
-                if self.find_mode(img) == 1:
-                    x_new[b, -1] = img[0] 
-                else:
-                    x_new[b, :3] = img
-        return x_new
-
     def forward(self, x, tf=None):
-        x_inter = []
-        x = self.make_input(x)
-        
+        x_inter = []        
         # layer0 rgb
         x_rgb_0 = self.conv1_rgb_0(x[:, :3])        #/1
         x_rgb_1 = self.conv1_rgb_1(x_rgb_0)         #/2
@@ -313,7 +291,7 @@ class PIDnetTF(nn.Module):
         x_rgb = x_rgb_3
 
         # layer0 ir
-        x_irinp = x[:, -1].unsqueeze(1)
+        x_irinp = x[:, -1:]
         # tf[:, :, 2] = tf[:, :, 2]
         
         # grid = F.affine_grid(tf, x_irinp.size(), align_corners=True)
@@ -408,28 +386,6 @@ class PIDnetTF(nn.Module):
         os.makedirs(f'{path}', exist_ok=True)
         torch.save(self.state_dict(), os.path.join(path, f'Epoch{epoch}.pt'))
 
-def make_square_input(x, base=512):
-    H, W = x.shape[-2:]
-    if H > W:
-        H_new = base
-        W_new = int((H_new / H) * W)
-    else:
-        W_new = base
-        H_new = int((W_new / W) * H)
-    x = F.interpolate(x, (H_new, W_new), mode='bilinear', align_corners=algc)
-
-    max_dim = max(H_new, W_new)
-    padding_height = max_dim - H_new
-    padding_width = max_dim - W_new
-    pad_top = padding_height // 2
-    pad_bottom = padding_height - pad_top
-    pad_left = padding_width // 2
-    pad_right = padding_width - pad_left
-    padding = (pad_left, pad_right, pad_top, pad_bottom)
-    x = F.pad(x, padding, "constant", 0)  # Pad with zeros
-    reverse_pad = lambda x: x[:, :, padding[2]:-padding[3] or None, padding[0]:-padding[1] or None]
-    return x, reverse_pad
-
 def custom_pretrained(input_res, num_classes, depths, windows_size):
     model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths)
     configuration = Swinv2Config(image_size = input_res, window_size=windows_size, num_channels=3, depths=[2, *depths, 2])
@@ -471,7 +427,6 @@ def custom_pretrained(input_res, num_classes, depths, windows_size):
     msg = model.diff4.load_state_dict(model_pid.diff4.state_dict(), strict=True)
     torch.save(model.state_dict(), 'pretrained_480x640_w8_2_6.pth')
     return model
-    
     
 
 from time import time

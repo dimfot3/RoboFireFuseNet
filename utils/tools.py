@@ -291,53 +291,12 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         images = batch[0]
         label = batch[1][0].detach().cpu().numpy().astype('uint8')
         outputs = inf_model(images)
-        images = (images[0].detach().cpu().numpy() * 255).astype('uint8')
-        images = images[:3] if images[1:3].sum() > 0.2 else images[3:]
+        images = (np.transpose(images[0, :3, :, :].detach().cpu().numpy(), (1, 2, 0)) * val_data.std_rgb) + val_data.mean_rgb
+        images = (images * 255).astype('uint8')
         outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
         non_bg_idxs = outputs!=0
-        non_gt_idxs = label!=0
         outputs = val_data.label2color(outputs)
-        images = np.transpose(images, (1, 2, 0))
-        images[non_bg_idxs] = 0.19 * images[non_bg_idxs] + 0.78 * outputs[non_bg_idxs]
-        # images[non_gt_idxs] = 0.29 * images[non_gt_idxs] + 0.68 * gt[non_gt_idxs]
-        ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
-    os.makedirs(ex_path, exist_ok=True)
-    plt.savefig(os.path.join(ex_path, name))
-    plt.close(f)
-
-
-def qualitive_eval2(inf_model, val_data, ex_path='./outputs', name='example.png'):
-    """
-    Perform qualitative evaluation of the segmentation model and save the results.
-
-    Parameters:
-    inf_model (torch.nn.Module): The model used for inference.
-    val_data (Dataset): The validation dataset containing images and labels.
-    ex_path (str, optional): The directory path where output images will be saved. Defaults to './outputs'.
-    name (str, optional): The filename for the saved output image. Defaults to 'example.png'.
-
-    Returns:
-    None
-    """
-    valid_loader = iter(DataLoader(val_data, batch_size=1, shuffle=True))
-    f, ax = plt.subplots(2, 5, figsize=(20, 5))
-    for sampleid in range(10):
-        batch = next(valid_loader)
-        images = batch[0]
-        label = batch[1][0].detach().cpu().numpy().astype('uint8')
-        outputs = inf_model(images)
-        images = (images[0].detach().cpu().numpy() * 255).astype('uint8')
-        images = images[:3] if images[1:3].sum() > 0.2 else images[3:]
-        outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
-        non_bg_idxs = outputs!=0
-        non_gt_idxs = label!=0
-        intersect = outputs==label
-        outsect = outputs!=label
-        outputs = val_data.label2color(outputs)
-        labels = val_data.label2color(label)
-        images = np.transpose(images, (1, 2, 0))
-        images[outsect] = 0.19 * images[outsect] + 0.78 * labels[outsect]
-        # images[non_gt_idxs] = 0.29 * images[non_gt_idxs] + 0.68 * gt[non_gt_idxs]
+        images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))

@@ -30,11 +30,6 @@ class BaseDataset(data.Dataset):
         self.std_ir = std[3]
         self.scale_factor = scale_factor
 
-        self.files = []
-
-    def __len__(self):
-        return len(self.files[self.files['labeled'] == True]['name'].to_numpy())
-
     def input_transform(self, images):
         """
         Read the image and do the following steps:
@@ -178,8 +173,24 @@ class BaseDataset(data.Dataset):
                 images[i] = self.night_to_day(img) if self.is_night_based_on_brightness(img) else self.day_to_night(img)
         return images
 
+    def complementary_masking(self, image1, image2, patch_size=32):
+        H, W, _ = image1.shape
+        patch_mask = np.random.choice([0, 1], size=(H // patch_size + 1, W // patch_size + 1))
+        masked_image1 = np.zeros_like(image1)
+        masked_image2 = np.zeros_like(image2)
+        for i in range(0, H, patch_size):
+            for j in range(0, W, patch_size):
+                h_end = min(i + patch_size, H)
+                w_end = min(j + patch_size, W)
+                
+                if patch_mask[i // patch_size, j // patch_size] == 1:
+                    masked_image1[i:h_end, j:w_end, :] = image1[i:h_end, j:w_end, :]
+                else:
+                    masked_image2[i:h_end, j:w_end, :] = image2[i:h_end, j:w_end, :]
+        return masked_image1, masked_image2
+
     def gen_sample(self, images, label,
-                   multi_scale=True, is_flip=True, edge_pad=True, edge_size=4, brightness=True, contrast=True, single_source=False):
+                   multi_scale=True, is_flip=True, edge_pad=True, edge_size=4, brightness=True, comp_mask=False, single_source=False):
         """
         generate a training sample by applying augmentation, then generates edge label with cv2 and then 
         normalizes the images and the label and return image, label and edges
@@ -201,6 +212,13 @@ class BaseDataset(data.Dataset):
                                                 rand_scale=1, rand_crop=True)
         images = self.input_transform(images)
         label = self.label_transform(label)
+
+        if comp_mask and (np.random.rand() < 0.1):
+            images[0], images[1] = self.complementary_masking(images[0], images[1], 32)
+        if single_source and (np.random.rand() < 0.1):
+            p = np.random.randint(0, 2)
+            images[0], images[1] = (1 - p) * images[0], images[1]* p
+
         images = [image.transpose(2, 0, 1) for image in images]
 
         if is_flip:

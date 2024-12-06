@@ -42,13 +42,13 @@ def valid(trainer, val_data, cur_epoch, args):
         conf_mat += curr_conf_mat
         running_loss += loss.item() / len(valid_loader)
     metrics, iou = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'], val=True)
-    # qualitive_eval(lambda data: trainer.inference(data), val_data, 
-    #                ex_path=f'./outputs/{args["PROJECTNAME"]}/{args["SESSIONAME"]}/visualizations', name=f'Epoch_{cur_epoch}.png')
+    qualitive_eval(lambda data: trainer.inference(data), val_data, 
+                   ex_path=f'./outputs/{args["PROJECTNAME"]}/{args["SESSIONAME"]}/visualizations', name=f'Epoch_{cur_epoch}.png')
     return metrics, iou
 
 def main(args):
     set_reproducibility(args['SEED'])
-    train_dataset, val_dataset = get_dataset(args)
+    train_dataset, val_dataset, _ = get_dataset(args)
     model = get_model(args)
     logger = Logger(args)
     train(model, train_dataset, val_dataset, args, logger)

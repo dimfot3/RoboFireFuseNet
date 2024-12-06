@@ -26,14 +26,12 @@ class WildFire(BaseDataset):
                  mean=[0, 0, 0, 0],
                  std=[1, 1, 1, 1],
                  bd_dilate_size=4, 
-                 n_stack=5,
-                 frames_appart=5,
                  seed=200,
-                 load_cache=True,
                  mode='fusion',
-                 interpolation=False,
-                 blend_images_p=0.6,
-                 robust_train=False):
+                 blend_images=False,
+                 robust_train=False,
+                 comp_mask=False,
+                 single_source=False):
 
         self.mean = mean
         self.std = std
@@ -43,94 +41,33 @@ class WildFire(BaseDataset):
         self.root = root
         self.list_path = list_path
         self.num_classes = num_classes
-        self.load_cache = load_cache
-        self.interpolation = interpolation
         self.mode = mode
         self.multi_scale = multi_scale
         self.flip = flip
         self.brightness = brightness
         self.contrast = contrast
-        self.img_list = [line[:-1] for line in open(os.path.join(root, list_path))]
-        self.files = self.read_files()
+        self.files = [line for line in open(os.path.join(root, list_path)).read().split('\n') if len(line) > 0]
         self.ignore_label = ignore_label
         self.robust_train = robust_train
-        
         self.color_list = [[0, 0, 0], [125, 125, 125],[255, 255, 255]] if num_classes == 3 else [
         (0, 0, 0),          # 0:    background(unlabeled)
-        (0, 0, 142),        # 1:    Car
-        (0, 60, 100),       # 2:    Bus
-        (0, 0, 230),        # 3:    Motorcycle
-        (119, 11, 32),      # 4:    Bicycle
-        (255, 0, 0),        # 5:    Pedestrian
-        (0, 139, 139),      # 6:    Motorcyclist
-        (255, 165, 150),    # 7:    Bicyclist
-        (192, 64, 0),       # 8:    Cart
-        (211, 211, 211),    # 9:    Bench
-        (100, 33, 128),     # 10:   Umbrella
-        (117, 79, 86),      # 11:   Box
-        (153, 153, 153),    # 12:   Pole
-        (190, 122, 222),    # 13:   Street_lamp
-        (250, 170, 30),     # 14:   Traffic_light
-        (220, 220, 0),      # 15:   Traffic_sign
-        (222, 142, 35),     # 16:   Car_stop
-        (205, 155, 155),    # 17:   Color_cone
-        (70, 130, 180),     # 18:   Sky
-        (128, 64, 128),     # 19:   Road
-        (244, 35, 232),     # 20:   Sidewalk
-        (0, 0, 70),         # 21:   Curb
-        (107, 142, 35),     # 22:   Vegetation
-        (152, 251, 152),    # 23:   Terrain
-        (70, 70, 70),       # 24:   Building
-        (110, 80, 100),      # 25:   Ground
-        (255, 255, 255)      # 26:   ignore
+        (64, 0, 128),        # 1:    Car
+        (64, 64, 0),       # 2:    person
+        (0, 128, 192),        # 3:    bike
+        (0, 0, 192),      # 4:    curve
+        (128, 128, 0),        # 5:    car_stop
+        (64, 64, 128),      # 6:    guardrail
+        (192, 128, 128),    # 7:    color_cone
+        (192, 64, 0)       # 8:    bump
         ]
-        self.mious = np.array([1/9] * 9)
-        self.class_weights = None
         self.bd_dilate_size = bd_dilate_size
-        self.n_stack = n_stack
-        self.frames_appart = frames_appart
         self.seed = seed
-        self.blend_images_p = blend_images_p
-    
-    def read_files(self):
-        cache_file_path = os.path.join(self.root, self.list_path + '.cache_df.csv')
-        if os.path.exists(cache_file_path) and self.load_cache:
-            return pd.read_csv(cache_file_path)
-        
-        labeled_files = []
-        for item in self.img_list:
-            folder, item = '/'.join(item.split('/')[:-1]), item.split('/')[-1]
-            name = os.path.splitext(os.path.basename(item))[0]
-            id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)]|(\d{5})[A-Za-z]_XXX)', name)
-            labeled_files.append({
-                "folder": folder,
-                "name": name,
-                "prefix": id_finder.group(1),
-                "id": int(id_finder.group(2) or id_finder.group(3) or id_finder.group(4)),
-                "labeled": True})
-        df = pd.DataFrame(labeled_files)
-        unique_folders = df['folder'].unique()
-        for folder in unique_folders:
-            folder_path = os.path.join(self.root, folder)
-            all_files = [file for file in os.listdir(folder_path) if (file.find('_rgb') != -1)]
-            for file_name in all_files:
-                file_name = file_name.replace('_rgb_', '_XXX_').replace('_rgb', '_XXX')
-                name = os.path.splitext(file_name)[0]
-                id_finder = re.search(r'^(.*?)(?:_I?(\d{5})_|[(](\d+)[)]|(\d{5})[A-Za-z]_XXX)', name)
-                prefix = id_finder.group(1)
-                id_value = int(id_finder.group(2) or id_finder.group(3) or id_finder.group(4))
-                if not (df['name'] == name).any():
-                    labeled_files.append({
-                        "folder": folder,
-                        "name": name,
-                        "prefix": prefix,
-                        "id": id_value,
-                        "labeled": False  # Mark as not labeled
-                    })
-        df = pd.DataFrame(labeled_files)
-        df.to_csv(os.path.join(self.root, self.list_path + '.cache_df.csv'), index=False)
-        print("DataFrame saved to cache.")
-        return df
+        self.blend_images = blend_images
+        self.comp_mask = comp_mask
+        self.single_source = single_source
+
+    def __len__(self):
+        return len(self.files)
 
     def color2label(self, color_map):
         label = np.ones(color_map.shape[:2])*self.ignore_label
@@ -144,53 +81,6 @@ class WildFire(BaseDataset):
             color_map[label==i] = self.color_list[i]
         return color_map.astype(np.uint8)
     
-    def filter_by_prefix_and_id_range(self, df, row_index, k):
-        target_row = df[df['labeled'] == True].iloc[row_index]
-        target_prefix = target_row['prefix']
-        target_id = int(target_row['id'])
-        same_prefix_df = df[df['prefix'] == target_prefix]
-        filtered_df = same_prefix_df[(same_prefix_df['id'].astype(int) >= target_id - k) &
-                                    (same_prefix_df['id'].astype(int) <= target_id + k)]
-        return target_row, filtered_df[filtered_df['name'] != target_row['name']]
-
-    def pick_target_with_candidates(self, candidates, target_row):
-        target_name = target_row['name']
-        folder = target_row['folder']
-        candidates = pd.concat([candidates, target_row.to_frame().T], axis=0, ignore_index=True)
-        idxs = np.argsort(candidates['id'].to_numpy() - int(target_row['id']))[::-1]
-        selected_candidates = candidates.iloc[idxs[:(self.n_stack - 1)]]
-        images = [os.path.join(folder, name) for name in selected_candidates['name'].tolist()]
-        names = selected_candidates['name'].tolist()
-        if (candidates['id'].to_numpy().max() != int(target_row['id'])) and \
-            ((candidates['id'].to_numpy().min() != int(target_row['id']))) and self.interpolation:
-            images.append(os.path.join(folder, candidates.iloc[idxs[-1]]['name']))
-            names.append(candidates.iloc[idxs[-1]]['name'])
-        images.append(os.path.join(folder, target_name))
-        names.append(target_name)
-        if self.interpolation and len(images) == self.n_stack:
-            images[0] = images[-1]
-        return images, names
-    
-    def get_async_multi_modal_inputs(self, list_of_imgs):
-        modal_file_paths = []
-        start_with = 'rgb' if self.mode == 'fusion' else self.mode
-        for i in range(len(list_of_imgs)):
-            replacement = start_with if i % 2 == 0 else 'ir' if start_with == 'rgb' else 'rgb'
-            modal_file_paths.append(os.path.join(self.root, list_of_imgs[i].replace('XXX', replacement)))
-        if self.interpolation and (len(modal_file_paths) != self.n_stack):
-            modal_file_paths[0] = modal_file_paths[0].replace(*(['ir', 'rgb'] if start_with =='ir' else ['rgb', 'ir']))
-        label_path = os.path.join(self.root, list_of_imgs[-1].replace('XXX', 'gt') + '.png')        # label is in png as there must be no compression
-        extensions = ['png', 'jpg']
-        existing_files = []
-        for path in modal_file_paths:
-            directory = os.path.dirname(path)
-            file_name = os.path.basename(path)
-            for ext in extensions:
-                full_path = os.path.join(directory, file_name + '.' + ext)
-                if os.path.exists(full_path):
-                    existing_files.append(full_path)
-        return existing_files, label_path
-
     def random_transformation_matrix(self, scale_range=(0.9, 1.1), 
                                  rotation_range=(-8, 8), 
                                  translation_range=(-15, 15)):
@@ -216,40 +106,6 @@ class WildFire(BaseDataset):
         
         return transformation_matrix, scale_x, (trans_x, trans_y), theta
 
-    def get_async_cand(self, index):
-        target, cands = self.filter_by_prefix_and_id_range(self.files, index, self.frames_appart)
-        list_of_imgs, names = self.pick_target_with_candidates(cands, target)
-        images, label = self.get_async_multi_modal_inputs(list_of_imgs)
-        loaded_images = []
-        tf = 0
-        for path in images:
-            with Image.open(path).convert('L' if '_ir' in path else 'RGB') as img:
-                img = np.asarray(img)
-                img = img.reshape(*(img.shape[:2]), -1)
-                # if ('_ir' in path):
-                #     img, tf = self.transform_image(img, scale=1.00, translate=(0, 0), angle=8 * np.pi / 180)
-                # else:
-                #     img, tf = self.transform_image(img, scale=1.00, translate=[-0, -0], angle=-8 * np.pi / 180)
-                if ('_ir' in path) and self.robust_train:
-                    tf, scale, trans, theta = self.random_transformation_matrix()
-                    scale, trans, theta = scale if np.random.rand() < 0.0 else 1, \
-                        trans if np.random.rand() < 0.0 else (0, 0), theta if np.random.rand() < 0.0 else 0
-                    img, tf = self.transform_image(img, scale=scale, translate=trans, angle=theta)
-                    maskout = img[:, :, 0].astype('uint8')==0
-                # else:
-                #     img = self.transform_image(img, scale=1, translate=(-8, -8), angle=0)
-                loaded_images.append(img.copy())
-        if(len(images)!=self.n_stack):      # this is used for interpolation method
-            loaded_images[0] = loaded_images[0] * 0.5 + loaded_images[1] * 0.5
-            loaded_images.pop(1)
-            names.pop(1)
-        with Image.open(label) as label_img:
-            label = np.asarray(label_img) if np.asarray(label_img).shape[-1] !=4 else np.asarray(label_img.convert('RGB'))
-            label = label.copy() if len(label.shape) == 2 else self.color2label(label).copy()
-            if self.robust_train:
-                label[maskout] = self.ignore_label
-        return loaded_images, label, names, tf
-
     def blend_objects(self, img1_list, mask1, img2_list, mask2):
         hor_shift, ver_shift = np.random.randint(0, 500), np.random.randint(0, 500)
         mask1 = np.roll(np.roll(mask1, hor_shift, axis=1), ver_shift, axis=0)
@@ -265,22 +121,37 @@ class WildFire(BaseDataset):
             img2_list[i][obj_mask] = img1_list[i][obj_mask]
         return img2_list, mask2
 
+    def load_sample(self, index):
+        rgb_img = np.asarray(Image.open(os.path.join(self.root, self.files[index].replace('XXX', 'rgb'))).convert('RGB')).copy()
+        ir_img = np.asarray(Image.open(os.path.join(self.root, self.files[index].replace('XXX', 'ir'))).convert('L')).copy()
+        ir_img = ir_img.reshape(*(ir_img.shape[:2]), -1)
+        label_img = np.asarray(Image.open(os.path.join(self.root, self.files[index].replace('XXX', 'gt'))).convert('RGB')).astype('uint8').copy()
+        label_img = label_img[:, :, 0] if np.unique(label_img).shape[0] < 100 else self.color2label(label_img)
+        loaded_images = [rgb_img, ir_img]
+        return loaded_images, label_img
+
     def __getitem__(self, index):
-        loaded_images, label, names, tf = self.get_async_cand(index)
-        if np.random.rand() < self.blend_images_p:
+        loaded_images, label = self.load_sample(index)
+        # blend augmentation
+        if self.blend_images and (np.random.rand() < 0.5):
             for i in range(3):
-                tmp_img, tmp_label, names, _ = self.get_async_cand(np.random.randint(0, len(self)))
-                loaded_images, label = self.blend_objects(tmp_img, tmp_label, loaded_images, label)
+                tmp_loaded_images, tmp_label = self.load_sample(np.random.randint(0, len(self)))
+                loaded_images, label = self.blend_objects(tmp_loaded_images, tmp_label, loaded_images, label)
+        # add transformation if robust_train
+        if self.robust_train:
+            _, scale, trans, theta = self.random_transformation_matrix()
+            loaded_images[-1], inv_tf = self.transform_image(loaded_images[-1], angle=theta, scale=scale, translate=trans)
+        # rest augmentation and image normalizations
         images, label, edge = self.gen_sample(loaded_images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
-                                edge_size=self.bd_dilate_size, brightness=self.brightness, contrast=self.contrast)
-        for i, img in enumerate(images):
-            if img.shape[0] == 1:
-                images[i] = np.append(images[i], np.zeros((2, images[i].shape[1], images[i].shape[2])), axis=0)
+                                edge_size=self.bd_dilate_size, brightness=self.brightness, comp_mask=self.comp_mask, single_source=self.single_source)
         images = np.concatenate(images, axis=0)
-        if self.mode != 'fusion':
+        # return rgb only, ir only or fusion (default) depending on mode 
+        if self.mode == 'rgb':
             images = images[:3]
-        return images.copy(), label.copy(), edge.copy(), [names], tf
+        elif self.mode == 'ir':
+            images = images[3]
+        return images.copy(), label.copy(), edge.copy(), [self.files[index].split('/')[-1]], inv_tf if self.robust_train else ()
 
     def single_scale_inference(self, config, model, image):
         pred = self.inference(config, model, image)
@@ -388,25 +259,20 @@ if __name__ == '__main__':
                           crop_size=[272, 336],
                           base_size=336,
                           bd_dilate_size=4,
-                          n_stack=2,
-                          frames_appart=0,
-                          load_cache=True,
-                          mode='fusion', interpolation=True)
-    for i in np.random.choice(len(dataset), 3):
-        images, label, edge, name = dataset[i]
-        images = images.reshape(len(images) // 3, 3, images.shape[-2], images.shape[-1])
+                          mode='fusion', robust_train=True, comp_mask=True, single_source=True)
+    for idx in np.random.choice(len(dataset), 3):
+        images, label, edge, name, tf = dataset[idx]
         f, ax = plt.subplots(1, len(images) + 2)
-        for i, img in enumerate(images[0:1]):
-            img = (img * 255).astype('uint8')
+        images = [images[:3], images[3:]]
+        stds, means = [dataset.std_rgb, dataset.std_ir], [dataset.mean_rgb, dataset.mean_ir]
+        for i, img in enumerate(images):
             img = np.transpose(img, (1, 2, 0))
-            if img[:, :, 1:].sum() == 0:
-                img = img[:, :, 0]
-            ax[i].imshow(img)
+            img = (img * stds[i]) + means[i]
+            images[i] = (img * 255).astype('uint8')
         label = dataset.label2color(label).astype('uint8')
-        edge = edge.astype('int')
-        ax[-2].imshow(label)
-        ax[-1].imshow(edge)
-        plt.imsave('test.png', label)
-        plt.imsave('test2.png', edge)
-        plt.imsave('test3.png', img)
+        edge = edge.astype('uint8')
+        plt.imsave(f'rgb_image{idx}.png', images[0])
+        plt.imsave(f'ir_image{idx}.png', images[1][:, :, 0])
+        plt.imsave(f'label{idx}.png', label)
+        plt.imsave(f'edge{idx}.png', edge)
         
