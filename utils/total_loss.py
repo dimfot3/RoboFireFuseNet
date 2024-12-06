@@ -118,7 +118,34 @@ class BondaryLoss(nn.Module):
         bce_loss = self.coeff_bce * self.weighted_bce(bd_pre, bd_gt)
         loss = bce_loss
         return loss
+
+def kv_loss(student_features, teacher_features, temperature=1.0):
+    """
+    Compute Knowledge Distillation (KV Loss) between student and teacher features.
     
+    Args:
+        student_features (torch.Tensor): Features from the RGB-transformed model (student).
+        teacher_features (torch.Tensor): Features from the IR model (teacher).
+        temperature (float): Temperature parameter to smooth the distributions.
+
+    Returns:
+        torch.Tensor: The KV loss value.
+    """
+    # Normalize features for cosine similarity
+    student_features = student_features / (student_features.norm(dim=1, keepdim=True) + 1e-8)
+    teacher_features = teacher_features / (teacher_features.norm(dim=1, keepdim=True) + 1e-8)
+
+    # Compute Cosine Similarity loss
+    cosine_similarity_loss = 1 - torch.mean((student_features * teacher_features).sum(dim=1))
+
+    # Optionally add MSE as another component (optional)
+    mse_loss = torch.nn.functional.mse_loss(student_features, teacher_features)
+
+    # Combine the two losses (optional: weighted sum)
+    loss = cosine_similarity_loss + (temperature * mse_loss)
+
+    return loss
+
 class TotalLoss:
     def __init__(self, args):
         self.align_corners = args['ALIGN_CORNERS']
@@ -129,6 +156,25 @@ class TotalLoss:
         self.class_weights = args['CLASS_WEIGHTS']
         self.defuse_weights = [1, 0.5, 0.5]
         self.miou_ce = NewCE(self.class_weights)
+        self.mse_loss = nn.MSELoss()
+        self.loss_params = torch.nn.SmoothL1Loss()
+        
+
+        self.affine_loss = lambda tf_pred, tf_gt: torch.nn.functional.mse_loss(tf_pred, tf_gt)
+        self.transformation_consistency_loss = lambda x_ir_new, x_ir, tf: torch.nn.functional.mse_loss(
+            F.grid_sample(x_ir_new, F.affine_grid(tf, x_ir_new.size(), align_corners=False), align_corners=False),
+            x_ir
+        )
+        self.cosine_similarity_loss = lambda x_ir_new, x_rgb_ir: 1 - torch.nn.functional.cosine_similarity(
+            x_ir_new, x_rgb_ir, dim=-1
+        ).mean()
+        self.mse_loss = lambda x_ir_new, x_rgb_ir: torch.nn.functional.mse_loss(x_ir_new, x_rgb_ir)
+        self.kl_divergence_loss = lambda x_ir_new, x_ir: kv_loss(x_ir_new, x_ir, temperature=1)
+        self.geometric_alignment_loss = lambda x_ir_new, x_ir, tf_pred: torch.nn.functional.mse_loss(
+            F.grid_sample(x_ir, F.affine_grid(tf_pred, x_ir.size(), align_corners=False), align_corners=False),
+            x_ir_new
+        )
+
         if args['USE_OHEM']:
             self.sem_criterion = OhemCrossEntropy(args, ignore_label=args['IGNORE_LABEL'],
                                         thres=args['OHEMTHRES'],
@@ -292,21 +338,27 @@ class TotalLoss:
             class_centers.append(feature_centers)
         return class_centers
 
-    def get_loss(self, outputs, labels, bd_gt):
+    def get_loss(self, outputs, labels, bd_gt, tf=None):
         """
         Calculates total prediction loss, including semantic loss (using OHEM or cross-entropy), 
         boundary loss (using CE), and additional semantic loss for detected boundaries.
         :return: the loss, the semantic maps (from both propotion and integral head),
         the avg pixel accuracy and the segmentation and boundary losses.
         """
-        defuse_loss = 0
-        if(len(outputs) > 3):
-            intermed_feat, outputs = outputs[-1],  outputs[:-1]
-            # class_centers = self.compute_class_centers(*intermed_feat, labels)
-            # l1 = self.compute_Ldc(class_centers, rho_1=1)
-            # l2 = self.compute_Lsps(class_centers, rho_2=0.7)
-            # l3 = self.compute_Lshs(class_centers, alpha=2, rho_3=0.7)
-            # defuse_loss = sum([self.defuse_weights[0] * l1 + self.defuse_weights[1] * l2 + self.defuse_weights[2] * l3]) / outputs[1].shape[0]
+        loss = torch.tensor(0).to(labels.device).to(torch.float)
+        robust_out, outputs = outputs[-1], outputs[:-1]
+        if tf != None:
+            x_ir, x_ir_new, x_rgb_ir, tf_pred = robust_out
+            maskout = torch.repeat_interleave(F.interpolate(torch.tensor((labels == self.ignore_label).to(torch.float)).unsqueeze(1), \
+                                    x_ir_new.shape[-2:], mode='nearest').to(torch.bool), x_rgb_ir.shape[1], 1)
+            x_rgb_ir, x_ir_new, x_ir = x_rgb_ir * (~maskout), x_ir_new * (~maskout), x_ir * (~maskout)
+            loss +=   self.kl_divergence_loss(x_rgb_ir, x_ir)
+            #         0.0 * self.transformation_consistency_loss(x_ir_new, x_ir, tf) + \
+            #         0.0 * self.cosine_similarity_loss(x_ir_new, x_rgb_ir) + \
+            #         0.0 * self.mse_loss(x_ir_new, x_rgb_ir) + \
+            #         0.0 * self.kl_divergence_loss(x_ir, x_ir_new) +\
+            #         0.0 * self.geometric_alignment_loss(x_ir_new, x_ir, tf_pred) +\
+            #         0.0 * self.affine_loss(tf_pred[:, :, 2], tf[:, :, 2])
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if (ph != h) or (pw != w):
@@ -322,7 +374,7 @@ class TotalLoss:
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
-        loss = loss_s + loss_b + (loss_sb if not torch.isnan(loss_sb) else 0) # + loss_miou
+        loss += (loss_s if not torch.isnan(loss_sb) else 0)  + (loss_b if not torch.isnan(loss_sb) else 0) + (loss_sb if not torch.isnan(loss_sb) else 0) # + loss_miou
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 
@@ -338,6 +390,7 @@ class MaskedMSELoss():
             for i in range(len(outputs)):
                 outputs[i] = F.interpolate(outputs[i], size=(
                     h, w), mode='bilinear', align_corners=self.align_corners)
+                
         pred = outputs[1]
         integ_pred = outputs[0]
         bd_pred = outputs[2]
@@ -411,6 +464,7 @@ class NewCE:
             # assumes output of a sigmoid layer
             B, H, W = probas.size()
             probas = probas.view(B, 1, H, W)
+
         B, C, H, W = probas.size()
         probas = probas.permute(0, 2, 3, 1).contiguous().view(-1, C)  # B * H * W, C = P, C
         labels = labels.view(-1)

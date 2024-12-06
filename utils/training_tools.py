@@ -28,24 +28,37 @@ class Trainer:
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
         self.stop_counter = args['STOPCOUNTER']
+        self.robust_train = args['ROBUST_TRAIN']
         self.start_epoch = 0
         self.best_metric = 0
         self.stop_cur_counter = 0
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(args['CHECKPOINT']), test)
+        if args['ROBUST_TRAIN']:
+            for param in model.parameters():
+                param.requires_grad = False
+            for param in model.robust_module.parameters():
+                param.requires_grad = True
+            conv_rob = [*(model.conv0_rob.parameters()), *(model.conv1_rob.parameters()), *(model.conv2_rob.parameters())]
+            for param in conv_rob:
+                param.requires_grad = True
+            
+        # model.robust_module = None
 
     def training_step(self, batch):
         self.model.train()
         self.optimizer.zero_grad()
-        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
+        images, labels, edges, names, tf = batch[0].to(dtype=torch.float, device=self.device), \
+            batch[1].to(dtype=torch.long, device=self.device), \
+        batch[2].to(dtype=torch.float, device=self.device), batch[3], \
+        batch[4].to(dtype=torch.float, device=self.device) if self.robust_train else None
         with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=self.use_amp):
-            output = self.model(images)
+            output = self.model(images, tf)
             output_mask = F.interpolate(
                                 output[1],
                                 size=[images.shape[-2], images.shape[-1]],
                                 mode='bilinear', align_corners=True)
-            losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
+            losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges, tf)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
         loss = losses.mean()
         self.scaler.scale(loss).backward()
@@ -56,30 +69,32 @@ class Trainer:
 
     def valid_step(self, batch):
         self.model.eval()
-        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
-        output = self.model(images)
+        images, labels, edges, names, tf = batch[0].to(dtype=torch.float, device=self.device), \
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3], \
+        batch[4].to(dtype=torch.float, device=self.device) if self.robust_train else None
+        output = self.model(images, tf)
         output_mask = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
+        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges, tf)
         loss = losses.mean()
         return loss.detach(), conf_mat
 
     
     def test_step(self, batch):
         self.model.eval()
-        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
-        output = self.model(images)
+        images, labels, edges, names, tf = batch[0].to(dtype=torch.float, device=self.device), \
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3], \
+        batch[4].to(dtype=torch.float, device=self.device) if self.robust_train else None
+        output = self.model(images, tf)
         output_mask = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
+        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges, tf)
         loss = losses.mean()
         return loss.detach(), conf_mat
 
@@ -99,6 +114,8 @@ class Trainer:
             optimizer = optim.SGD(model.parameters(), lr=args['LR'], momentum=args['MOMENTUM'], weight_decay=args['WD']) 
         elif args['OPTIM'] == 'ADAM':
             optimizer = optim.Adam(model.parameters(), lr=args['LR'], weight_decay=args['WD'])
+        elif args['OPTIM'] == 'ADAMW':
+            optimizer = optim.AdamW(model.parameters(), lr=args['LR'], weight_decay=args['WD'])
         else:
             print('Unsupported optimizer.')
             exit()
@@ -164,7 +181,8 @@ def get_dataset(args, test=False):
                           frames_appart=args['MAX_FR_APART'],
                           mode=args['MODE'],
                           interpolation=args['INTERPOLATION'],
-                          blend_images_p=0.5)
+                          blend_images_p=float(args['BLEND_IMGS_P']),
+                          robust_train=args['ROBUST_TRAIN'])
     
     val_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['VALIDSET'],
@@ -182,7 +200,8 @@ def get_dataset(args, test=False):
                           frames_appart=args['MAX_FR_APART'],
                           mode=args['MODE'],
                           interpolation=args['INTERPOLATION'],
-                          blend_images_p=0.0)
+                          blend_images_p=0.0,
+                          robust_train=args['ROBUST_TRAIN'])
     if test:
         test_dataset = WildFire(root=args['ROOTDATASET'],
                           list_path=args['TESTSET'],
@@ -200,7 +219,8 @@ def get_dataset(args, test=False):
                           frames_appart=args['MAX_FR_APART'],
                           mode=args['MODE'],
                           interpolation=args['INTERPOLATION'],
-                          blend_images_p=0.0)
+                          blend_images_p=0.0,
+                          robust_train=args['ROBUST_TRAIN'])
         return train_dataset, val_dataset, test_dataset
     return train_dataset, val_dataset
 
@@ -212,14 +232,10 @@ def get_model(args):
         model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']])
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=channels[args['MODE']])
-    elif 'async_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], deconv=args['DECONV'], input_resolution=args['BASE_SIZE'], config=args['TF_CONFIG'], window_size=(10, 5))
-    elif 'async_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], deconv=args['DECONV'], input_resolution=args['BASE_SIZE'], config=args['TF_CONFIG'], window_size=(10, 5))
     elif 'async2_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'], robust_module=args['ROBUST_TRAIN'])
     elif 'async2_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'])
+        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'], robust_module=args['ROBUST_TRAIN'])
     
     if args['PRETRAINED'] is not None:
         model.imgnet_pretrain(args['PRETRAINED'])

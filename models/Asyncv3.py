@@ -18,6 +18,7 @@ from math import gcd
 from einops.layers.torch import Rearrange
 BatchNorm2d = nn.BatchNorm2d
 from pidnet import PIDNet
+from robust_module import RobustModule
 bn_mom = 0.1
 algc = False
 
@@ -59,13 +60,19 @@ class ChannelAttentionModule(nn.Module):
 
 class PIDnetTF(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), tf_depths=(2, 6)):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), tf_depths=(2, 6), robust_module=False):
         super(PIDnetTF, self).__init__()
         self.augment = augment
         self.channels = channels
         self.window_size = window_size
         self.planes = planes
         input_resolution = np.array(input_resolution)
+        self.robust_module =  None
+        if robust_module:
+            self.robust_module = RobustModule(2*planes)
+            self.conv0_rob = nn.Sequential(nn.Conv2d(in_channels=planes, out_channels=planes, kernel_size=3, padding=1))
+            self.conv1_rob = nn.Sequential(nn.Conv2d(in_channels=planes, out_channels=planes, kernel_size=3, padding=1))
+            self.conv2_rob = nn.Sequential(nn.Conv2d(in_channels=planes, out_channels=planes, kernel_size=3, padding=1))
         # I Branch
         self.conv1_rgb_0 =  nn.Sequential(
                           nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
@@ -291,8 +298,10 @@ class PIDnetTF(nn.Module):
                     x_new[b, :3] = img
         return x_new
 
-    def forward(self, x):
+    def forward(self, x, tf=None):
+        x_inter = []
         x = self.make_input(x)
+        
         # layer0 rgb
         x_rgb_0 = self.conv1_rgb_0(x[:, :3])        #/1
         x_rgb_1 = self.conv1_rgb_1(x_rgb_0)         #/2
@@ -304,7 +313,13 @@ class PIDnetTF(nn.Module):
         x_rgb = x_rgb_3
 
         # layer0 ir
-        x_ir_0 = self.conv1_ir_0(x[:, -1].unsqueeze(1))
+        x_irinp = x[:, -1].unsqueeze(1)
+        # tf[:, :, 2] = tf[:, :, 2]
+        
+        # grid = F.affine_grid(tf, x_irinp.size(), align_corners=True)
+        # x_irinp = F.grid_sample(x_irinp, grid, align_corners=True)
+        
+        x_ir_0 = self.conv1_ir_0(x_irinp)
         x_ir_1 = self.conv1_ir_1(x_ir_0)
         x_ir_2 = self.conv1_ir_2(x_ir_1)
         # layer1 ir
@@ -312,8 +327,26 @@ class PIDnetTF(nn.Module):
         # layer2 ir
         x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
         x_ir = x_ir_3
+        
+        if self.robust_module != None:
+            x_ir_new, x_rgb_ir, tf = self.robust_module(x_rgb, x_ir, tf=None)
+            # tf = torch.tensor([[1, 0, 0],[0, 1, 0]], dtype=torch.float32).to(x_ir.device).unsqueeze(0).repeat(x_ir_new.shape[0], 1, 1)
+            x_inter = [x_ir, x_ir_new, x_rgb_ir, tf]
+            x_ir, x_ir_3 = x_rgb_ir, x_rgb_ir
+            # grid = F.affine_grid(tf, x_ir.size(), align_corners=False)
+            # x_ir = F.grid_sample(x_ir, grid, align_corners=False) + x_ir_new
+            x_ir_1 = x_ir_1 * 0
+            x_ir_2 = x_ir_2 * 0
+            x_ir_0 = x_ir_0 * 0
+            # grid = F.affine_grid(tf, x_ir_0.size(), align_corners=False)
+            # x_ir_0 = self.conv0_rob(F.grid_sample(x_ir_0, grid, align_corners=False))
+            # grid = F.affine_grid(tf, x_ir_1.size(), align_corners=False)
+            # x_ir_1 = self.conv1_rob(F.grid_sample(x_ir_1, grid, align_corners=False))
+            # grid = F.affine_grid(tf, x_ir_2.size(), align_corners=False)
+            # x_ir_2 = self.conv2_rob(F.grid_sample(x_ir_2, grid, align_corners=False))
+
+
         x = self.weight_channels_pre(torch.cat((x_rgb, x_ir), dim=1))
-        x_inter = [x_rgb[:, :self.planes], x_ir[:, :self.planes], x_rgb[:, self.planes:], x_ir[:, self.planes:]]        # (shared rgb, shared ir, rgb specific, ir specific)
         
         x_ = self.layer3_(x)
         x_d = self.layer3_d(x)
@@ -366,7 +399,6 @@ class PIDnetTF(nn.Module):
         
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
-            
             x_extra_d = self.seghead_d(temp_d)
             return [x_extra_p, x_, x_extra_d, x_inter]
         else:
@@ -451,7 +483,9 @@ if __name__ == '__main__':
     input_res = (480, 640)
     num_classes = 9
     depths= [2, 6]
-    model = custom_pretrained(input_res, num_classes, depths, windows_size).cuda().eval()
+    model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths).cuda()
+    model.eval()
+    # model = custom_pretrained(input_res, num_classes, depths, windows_size).cuda().eval()
     # summary(model, torch.randn(1, 4, *input_res), depth=30, device=device)
     avg = 0
     for i in range(100):

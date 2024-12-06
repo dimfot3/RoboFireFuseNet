@@ -20,7 +20,7 @@ def test(trainer, test_dataset, args, logger):
         loss_arr.append(loss.item())
         running_loss += loss.item() / len(test_loader)
     print(bad_items)
-    metrics = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'], val=True)
+    metrics, iou = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'], val=True)
     logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
     print('-'*shutil.get_terminal_size()[0])
     # logger.print_metrics(metrics_inst, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
@@ -34,7 +34,9 @@ def main(args):
     model = get_model(args)
     args['ONLINELOG'] = False
     logger = Logger(args)
+    
     trainer = Trainer(args, model, len(test_dataset), test=True)    
+    
     test(trainer, test_dataset, args, logger)
     logger.close()
 

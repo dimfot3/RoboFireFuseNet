@@ -1,19 +1,19 @@
 # corsican params
 # general
-PROJECTNAME: 'AsyncSearchv0'
-SESSIONAME: 'wildfire_robust_rot'
-DEVICE: 'cuda:1'
+PROJECTNAME: 'PIDnetWildfire'
+SESSIONAME: 'pidnet_ir'
+DEVICE: 'cuda:0'
 NUM_WORKERS: 8
 ONLINELOG: True
 SEED: 200
-STOPCOUNTER: 400
+STOPCOUNTER: 20
 VALID_FREQ: 2
-WARMUP: 20
-ROBUST_TRAIN: True
+WARMUP: 3
+ROBUST_TRAIN: False
 # model
-MODEL: 'async2_s'
+MODEL: 'pidnet_s'
 NUM_OUTPUTS: 2
-PRETRAINED:  'weights/AsyncSearchv0/wildfire2/checkpoint_epoch_170.pth'
+PRETRAINED:  'weights/PIDNet_S_ImageNet.pth.tar'
 CHECKPOINT: null
 WINDOW_SIZE: 8
 TF_CONFIG: [2, 6]
@@ -27,9 +27,9 @@ N_FRAMES: 2
 MAX_FR_APART: 0
 NUM_CLASSES: 3
 CLS_NAMES: ['background', 'smoke', 'fire']
-BLEND_IMGS_P: 0.5
+BLEND_IMGS_P: 0.0
 #['bg', 'smoke', 'fire']
-MODE: 'fusion'
+MODE: 'ir'
 MULTISCALE: True
 INTERPOLATION: False
 FLIP: True
@@ -52,12 +52,12 @@ ALIGN_CORNERS: True
 LR: 0.001
 BATCHSIZE: 5
 EPOCHS: 500
-OPTIM: 'ADAM'
-SCHED: 'COS'
+OPTIM: 'SGD'
+SCHED: 'POLY'
 USE_OHEM: False
 OHEMTHRES: 0.9
 OHEMKEEP: 131072
-WD: 0.00005
+WD: 0.00001
 MOMENTUM: 0.9
 NESTEROV: false
 BALANCE_WEIGHTS: [0.4, 1.0]

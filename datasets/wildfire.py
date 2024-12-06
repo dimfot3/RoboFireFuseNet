@@ -7,7 +7,8 @@ sys.path.insert(0, './datasets/')
 from base_dataset import BaseDataset
 import re
 import pandas as pd
-
+import torch
+import torchvision
 
 class WildFire(BaseDataset):
     def __init__(self, 
@@ -31,7 +32,8 @@ class WildFire(BaseDataset):
                  load_cache=True,
                  mode='fusion',
                  interpolation=False,
-                 blend_images_p=0.6):
+                 blend_images_p=0.6,
+                 robust_train=False):
 
         self.mean = mean
         self.std = std
@@ -51,6 +53,8 @@ class WildFire(BaseDataset):
         self.img_list = [line[:-1] for line in open(os.path.join(root, list_path))]
         self.files = self.read_files()
         self.ignore_label = ignore_label
+        self.robust_train = robust_train
+        
         self.color_list = [[0, 0, 0], [125, 125, 125],[255, 255, 255]] if num_classes == 3 else [
         (0, 0, 0),          # 0:    background(unlabeled)
         (0, 0, 142),        # 1:    Car
@@ -80,6 +84,7 @@ class WildFire(BaseDataset):
         (110, 80, 100),      # 25:   Ground
         (255, 255, 255)      # 26:   ignore
         ]
+        self.mious = np.array([1/9] * 9)
         self.class_weights = None
         self.bd_dilate_size = bd_dilate_size
         self.n_stack = n_stack
@@ -186,15 +191,53 @@ class WildFire(BaseDataset):
                     existing_files.append(full_path)
         return existing_files, label_path
 
+    def random_transformation_matrix(self, scale_range=(0.9, 1.1), 
+                                 rotation_range=(-8, 8), 
+                                 translation_range=(-15, 15)):
+       
+        # Random scaling
+        scale_x = np.random.uniform(*scale_range)
+        scale_y = scale_x
+
+        # Random rotation
+        theta = np.radians(np.random.uniform(*rotation_range))
+        cos_theta, sin_theta = np.cos(theta), np.sin(theta)
+
+        # Random translation
+        trans_x = np.random.uniform(*translation_range)
+        trans_y = np.random.uniform(*translation_range)
+
+        # Create the transformation matrix
+        transformation_matrix = np.array([
+            [scale_x * cos_theta, -scale_y * sin_theta, trans_x],
+            [scale_x * sin_theta,  scale_y * cos_theta, trans_y],
+            [0,                   0,                   1]
+        ])
+        
+        return transformation_matrix, scale_x, (trans_x, trans_y), theta
+
     def get_async_cand(self, index):
         target, cands = self.filter_by_prefix_and_id_range(self.files, index, self.frames_appart)
         list_of_imgs, names = self.pick_target_with_candidates(cands, target)
         images, label = self.get_async_multi_modal_inputs(list_of_imgs)
         loaded_images = []
+        tf = 0
         for path in images:
             with Image.open(path).convert('L' if '_ir' in path else 'RGB') as img:
                 img = np.asarray(img)
                 img = img.reshape(*(img.shape[:2]), -1)
+                # if ('_ir' in path):
+                #     img, tf = self.transform_image(img, scale=1.00, translate=(0, 0), angle=8 * np.pi / 180)
+                # else:
+                #     img, tf = self.transform_image(img, scale=1.00, translate=[-0, -0], angle=-8 * np.pi / 180)
+                if ('_ir' in path) and self.robust_train:
+                    tf, scale, trans, theta = self.random_transformation_matrix()
+                    scale, trans, theta = scale if np.random.rand() < 0.0 else 1, \
+                        trans if np.random.rand() < 0.0 else (0, 0), theta if np.random.rand() < 0.0 else 0
+                    img, tf = self.transform_image(img, scale=scale, translate=trans, angle=theta)
+                    maskout = img[:, :, 0].astype('uint8')==0
+                # else:
+                #     img = self.transform_image(img, scale=1, translate=(-8, -8), angle=0)
                 loaded_images.append(img.copy())
         if(len(images)!=self.n_stack):      # this is used for interpolation method
             loaded_images[0] = loaded_images[0] * 0.5 + loaded_images[1] * 0.5
@@ -203,7 +246,9 @@ class WildFire(BaseDataset):
         with Image.open(label) as label_img:
             label = np.asarray(label_img) if np.asarray(label_img).shape[-1] !=4 else np.asarray(label_img.convert('RGB'))
             label = label.copy() if len(label.shape) == 2 else self.color2label(label).copy()
-        return loaded_images, label, names
+            if self.robust_train:
+                label[maskout] = self.ignore_label
+        return loaded_images, label, names, tf
 
     def blend_objects(self, img1_list, mask1, img2_list, mask2):
         hor_shift, ver_shift = np.random.randint(0, 500), np.random.randint(0, 500)
@@ -213,7 +258,7 @@ class WildFire(BaseDataset):
         obj_ids = np.unique(mask1)
         obj_ids = obj_ids[obj_ids != 0]
         if len(obj_ids) == 0:   return img2_list, mask2
-        obj_id = np.random.choice(obj_ids)
+        obj_id = np.random.choice(obj_ids, 1)
         obj_mask = (mask1 == obj_id)
         mask2[obj_mask] = mask1[obj_mask]
         for i, img2 in enumerate(img2_list):
@@ -221,10 +266,10 @@ class WildFire(BaseDataset):
         return img2_list, mask2
 
     def __getitem__(self, index):
-        loaded_images, label, names = self.get_async_cand(index)
+        loaded_images, label, names, tf = self.get_async_cand(index)
         if np.random.rand() < self.blend_images_p:
             for i in range(3):
-                tmp_img, tmp_label, names = self.get_async_cand(np.random.randint(0, len(self)))
+                tmp_img, tmp_label, names, _ = self.get_async_cand(np.random.randint(0, len(self)))
                 loaded_images, label = self.blend_objects(tmp_img, tmp_label, loaded_images, label)
         images, label, edge = self.gen_sample(loaded_images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
@@ -235,11 +280,72 @@ class WildFire(BaseDataset):
         images = np.concatenate(images, axis=0)
         if self.mode != 'fusion':
             images = images[:3]
-        return images.copy(), label.copy(), edge.copy(), [names]
+        return images.copy(), label.copy(), edge.copy(), [names], tf
 
     def single_scale_inference(self, config, model, image):
         pred = self.inference(config, model, image)
         return pred
+
+    def transform_image(self, image, angle=0, scale=1.0, translate=(0, 0)):
+        angle = torch.tensor(angle)
+        translate = np.array(translate).astype('float')
+        translate[0], translate[1] = translate[0] / image.shape[0], translate[1] / image.shape[1]
+        scale = scale
+        # Scaling matrix
+        scaling_matrix = torch.tensor([
+            [scale, 0, 0],
+            [0, scale, 0],
+            [0, 0, 1]
+        ], dtype=torch.float64)
+        
+        # Rotation matrix
+        rotation_matrix = torch.tensor([
+            [torch.cos(angle), -torch.sin(angle), 0],
+            [torch.sin(angle),  torch.cos(angle), 0],
+            [0, 0, 1]
+        ], dtype=torch.float64)
+        
+        # Translation matrix
+        translation_matrix = torch.tensor([
+            [1, 0, translate[0]],
+            [0, 1, translate[1]],
+            [0, 0, 1]
+        ], dtype=torch.float64)
+
+        inv_scaling_matrix = torch.tensor([
+            [1/scale, 0, 0],
+            [0, 1/scale, 0],
+            [0, 0, 1]
+        ], dtype=torch.float64)
+        
+        # Rotation matrix
+        inv_rotation_matrix = torch.tensor([
+            [torch.cos(-angle), -torch.sin(-angle), 0],
+            [torch.sin(-angle),  torch.cos(-angle), 0],
+            [0, 0, 1]
+        ], dtype=torch.float64)
+        
+        # Translation matrix
+        inv_translation_matrix = torch.tensor([
+            [1, 0, -translate[0]],
+            [0, 1, -translate[1]],
+            [0, 0, 1]
+        ], dtype=torch.float64)
+        
+        # Combined transformation: scale -> rotate -> translate
+        transformation_matrix =  translation_matrix @ rotation_matrix @ scaling_matrix
+        inv_transformation_matrix = inv_scaling_matrix @ inv_rotation_matrix @ inv_translation_matrix
+        transformation_matrix = transformation_matrix[:2, :]  # Extract 2x3 affine matrix
+        inv_transformation_matrix = inv_transformation_matrix[:2, :].numpy()
+        # Create affine grid
+        grid = torch.nn.functional.affine_grid(transformation_matrix.unsqueeze(0),
+                                                torch.Size([1, image.shape[2], image.shape[0], image.shape[1]]),
+                                                align_corners=True)
+        input_tensor = torch.from_numpy(image.copy().astype('float64')).permute(2, 0, 1).unsqueeze(0)  # Convert to BCHW
+
+        output_tensor = torch.nn.functional.grid_sample(input_tensor, grid, mode='nearest', padding_mode='zeros', align_corners=True)  
+        output_tensor = output_tensor[0].permute(1, 2, 0).numpy().astype(image.dtype)
+        return output_tensor, inv_transformation_matrix
 
     def save_pred(self, images, labels, preds, name, path):
         if(len(preds.shape)>3):

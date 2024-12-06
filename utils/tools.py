@@ -269,7 +269,7 @@ def calculate_metrics(confusion_matrix, runloss, cls_names = None, cls_weights=N
         metrics[f'{"val " if val else ""}iou {names[i]}'] = iou[i]
         metrics[f'{"val " if val else ""}accuracy {names[i]}'] = accuracy[i]
         metrics[f'{"val " if val else ""}weighted_f1'] += cls_weights[i] * f1_score[i]
-    return metrics
+    return metrics, iou
 
 def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png'):
     """

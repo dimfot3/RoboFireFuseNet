@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+
 class ImageNet(Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
