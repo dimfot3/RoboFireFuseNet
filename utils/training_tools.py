@@ -133,7 +133,7 @@ class Trainer:
         return loss
 
     def stop_sign(self, metrics):
-        if metrics['val miou'] - self.best_metric > 0.01:
+        if metrics['val miou'] - self.best_metric > 0.001:
             self.best_metric, self.stop_cur_counter = metrics['val miou'], 0
         else:
             self.stop_cur_counter += 1

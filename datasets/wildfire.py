@@ -126,7 +126,9 @@ class WildFire(BaseDataset):
         ir_img = np.asarray(Image.open(os.path.join(self.root, self.files[index].replace('XXX', 'ir'))).convert('L')).copy()
         ir_img = ir_img.reshape(*(ir_img.shape[:2]), -1)
         label_img = np.asarray(Image.open(os.path.join(self.root, self.files[index].replace('XXX', 'gt'))).convert('RGB')).astype('uint8').copy()
-        label_img = label_img[:, :, 0] if np.unique(label_img).shape[0] < 100 else self.color2label(label_img)
+        unique_labels = np.unique(label_img)
+        unique_labels = unique_labels[unique_labels!=self.ignore_label]
+        label_img = label_img[:, :, 0] if unique_labels.max() < 100 else self.color2label(label_img) # dangarous line
         loaded_images = [rgb_img, ir_img]
         return loaded_images, label_img
 
