@@ -10,6 +10,7 @@ import pandas as pd
 import torch
 import torchvision
 
+
 class WildFire(BaseDataset):
     def __init__(self, 
                  root, 
@@ -141,8 +142,15 @@ class WildFire(BaseDataset):
                 loaded_images, label = self.blend_objects(tmp_loaded_images, tmp_label, loaded_images, label)
         # add transformation if robust_train
         if self.robust_train:
+            # scale, trans, theta = 1, np.array([2, 2]), 0
             _, scale, trans, theta = self.random_transformation_matrix()
-            loaded_images[-1], inv_tf = self.transform_image(loaded_images[-1], angle=theta, scale=scale, translate=trans)
+            loaded_images, label, inv_tf = self.transform_image(loaded_images, label, angle=theta, scale=scale, translate=trans)
+        # if True:
+        #     scale, trans, theta = 1 + 0.08, np.array([0, 0]), (0/180) * np.pi
+        #     loaded_imagestmp1, _, inv_tf = self.transform_image(loaded_images, label, angle=theta, scale=scale, translate=trans)
+        #     loaded_imagestmp2, _, _ = self.transform_image(loaded_images[::-1], label, angle=-theta, scale=1/scale, translate=-trans)
+        #     loaded_images[1] = loaded_imagestmp1[1]
+        #     loaded_images[0] = loaded_imagestmp2[1]
         # rest augmentation and image normalizations
         images, label, edge = self.gen_sample(loaded_images, label, 
                                 self.multi_scale, self.flip, edge_pad=False,
@@ -159,10 +167,10 @@ class WildFire(BaseDataset):
         pred = self.inference(config, model, image)
         return pred
 
-    def transform_image(self, image, angle=0, scale=1.0, translate=(0, 0)):
+    def transform_image(self, images, label, angle=0, scale=1.0, translate=(0, 0)):
         angle = torch.tensor(angle)
         translate = np.array(translate).astype('float')
-        translate[0], translate[1] = translate[0] / image.shape[0], translate[1] / image.shape[1]
+        translate[0], translate[1] = translate[0] / images[0].shape[0], translate[1] / images[0].shape[1]
         scale = scale
         # Scaling matrix
         scaling_matrix = torch.tensor([
@@ -208,17 +216,33 @@ class WildFire(BaseDataset):
         # Combined transformation: scale -> rotate -> translate
         transformation_matrix =  translation_matrix @ rotation_matrix @ scaling_matrix
         inv_transformation_matrix = inv_scaling_matrix @ inv_rotation_matrix @ inv_translation_matrix
-        transformation_matrix = transformation_matrix[:2, :]  # Extract 2x3 affine matrix
-        inv_transformation_matrix = inv_transformation_matrix[:2, :].numpy()
+        transformation_matrix = transformation_matrix[:2, :] 
+        inv_transformation_matrix = inv_transformation_matrix[:2, :]
         # Create affine grid
         grid = torch.nn.functional.affine_grid(transformation_matrix.unsqueeze(0),
-                                                torch.Size([1, image.shape[2], image.shape[0], image.shape[1]]),
-                                                align_corners=True)
-        input_tensor = torch.from_numpy(image.copy().astype('float64')).permute(2, 0, 1).unsqueeze(0)  # Convert to BCHW
+                                                torch.Size([1, images[0].shape[2], images[0].shape[0], images[0].shape[1]]),
+                                                align_corners=False)
+        grid_inv = torch.nn.functional.affine_grid(inv_transformation_matrix.unsqueeze(0),
+                                                torch.Size([1, images[0].shape[2], images[0].shape[0], images[0].shape[1]]),
+                                                align_corners=False)
+        input_ir = torch.from_numpy(images[1].copy().astype('float64')).permute(2, 0, 1).unsqueeze(0)  # Convert to BCHW
+        output_ir = torch.nn.functional.grid_sample(input_ir, grid, mode='nearest', padding_mode='zeros', align_corners=False)  
+        # output_ir = torch.nn.functional.grid_sample(output_ir, grid_inv, mode='nearest', padding_mode='zeros', align_corners=False)  
+        output_ir = output_ir[0].permute(1, 2, 0).numpy().astype(images[0].dtype)
+        
+        input_label = torch.from_numpy(np.expand_dims(label.copy(), -1).astype('float64')).permute(2, 0, 1).unsqueeze(0)  # Convert to BCHW
+        output_label = torch.nn.functional.grid_sample(input_label, grid, mode='nearest', padding_mode='zeros', align_corners=False)  
+        output_label = torch.nn.functional.grid_sample(output_label, grid_inv, mode='nearest', padding_mode='zeros', align_corners=False)  
+        output_label = output_label[0].permute(1, 2, 0).numpy().astype(label.dtype)[:, :, 0]
 
-        output_tensor = torch.nn.functional.grid_sample(input_tensor, grid, mode='nearest', padding_mode='zeros', align_corners=True)  
-        output_tensor = output_tensor[0].permute(1, 2, 0).numpy().astype(image.dtype)
-        return output_tensor, inv_transformation_matrix
+        input_rgb = torch.from_numpy(images[0].copy().astype('float64')).permute(2, 0, 1).unsqueeze(0)  # Convert to BCHW
+        output_rgb = torch.nn.functional.grid_sample(input_rgb, grid, mode='nearest', padding_mode='zeros', align_corners=False)  
+        output_rgb = torch.nn.functional.grid_sample(output_rgb, grid_inv, mode='nearest', padding_mode='zeros', align_corners=False)  
+        output_rgb = output_rgb[0].permute(1, 2, 0).numpy().astype(images[0].dtype)
+
+        inv_transformation_matrix = inv_transformation_matrix.numpy()
+        images = [output_rgb, output_ir]
+        return images, output_label, inv_transformation_matrix
 
     def save_pred(self, images, labels, preds, name, path):
         if(len(preds.shape)>3):
