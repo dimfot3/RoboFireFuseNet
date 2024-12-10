@@ -22,6 +22,10 @@ from robust_module import RobustModule
 bn_mom = 0.1
 algc = False
 
+modality_paths = True
+short_path = True
+swin_blocks = True
+
 
 class ChannelAttentionModule(nn.Module):
     def __init__(self, in_channels, out_channels, reduction=16):
@@ -156,6 +160,7 @@ class PIDnetTF(nn.Module):
         self.weight_channels_post = ChannelAttentionModule(3 * self.planes * 16, self.planes * 16, 32)
         
         tf_configuration = Swinv2Config(window_size=window_size, image_size=input_resolution, num_channels=self.planes * 2)
+        
         self.stage3 = Swinv2Stage(
                     config=tf_configuration,
                     dim=int(tf_configuration.embed_dim * 2**1),
@@ -176,13 +181,22 @@ class PIDnetTF(nn.Module):
                     downsample=Swinv2PatchMerging,
                     pretrained_window_size=tf_configuration.pretrained_window_sizes[2],
                 )
-        
+
         self.layer3 = torch.nn.Sequential(Swinv2Embeddings(Swinv2Config(window_size=window_size[0], num_channels=2*planes, patch_size=1, embed_dim=96 * 2)), \
                                 LambdaLayer(lambda xinp: self.stage3(xinp[0], xinp[1]))
                                 )
         self.layer3_unpatch = torch.nn.Sequential(LambdaLayer(lambda xinp: Rearrange('b (h w) c-> b c h w', h=xinp[2][-2]).forward(xinp[0])), torch.nn.Conv2d(96 * 4, 4 * planes, kernel_size=1))
+        
+        
+        
         self.layer4 = torch.nn.Sequential(LambdaLayer(lambda xinp: self.stage4(xinp[0], xinp[2][-2:])), \
                                 LambdaLayer(lambda xinp: Rearrange('b (h w) c-> b c h w', h=xinp[2][-2]).forward(xinp[0])), torch.nn.Conv2d(96 * 8, 8 * planes, kernel_size=1))
+        
+        if not swin_blocks:
+            self.layer3 = self._make_layer(BasicBlock, planes * 2, planes * 4, n, stride=2)
+            self.layer3_unpatch = nn.Identity()
+            self.layer4 = self._make_layer(BasicBlock, planes * 4, planes * 8, n, stride=2)
+        
         self.layer5 =  self._make_layer(Bottleneck, planes * 8, planes * 8, 2, stride=2)
       
         # P Branch
@@ -371,8 +385,11 @@ class PIDnetTF(nn.Module):
             
         x_ = self.layer5_(self.relu(x_))
         x_d = self.layer5_d(self.relu(x_d))
-
-        x = self.weight_channels_post(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
+        
+        if modality_paths:
+            x = self.weight_channels_post(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
+        else:
+            x = self.layer5(x)
 
         x = F.interpolate(
                         self.spp(x),
@@ -380,10 +397,11 @@ class PIDnetTF(nn.Module):
                         mode='bilinear', align_corners=algc)
 
         x_ = self.dfm(x_, x, x_d)
-        x_ = F.interpolate(x_, size=x_rgb_3.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv3(torch.cat((x_rgb_3, x_ir_3), dim=1))
-        x_ = F.interpolate(x_, size=x_rgb_2.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv2(torch.cat((x_rgb_2, x_ir_2), dim=1))
-        x_ = F.interpolate(x_, size=x_rgb_1.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv1(torch.cat((x_rgb_1, x_ir_1), dim=1))
-        x_ = F.interpolate(x_, size=x_rgb_0.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv0(torch.cat((x_rgb_0, x_ir_0), dim=1))
+        if short_path:
+            x_ = F.interpolate(x_, size=x_rgb_3.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv3(torch.cat((x_rgb_3, x_ir_3), dim=1))
+            x_ = F.interpolate(x_, size=x_rgb_2.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv2(torch.cat((x_rgb_2, x_ir_2), dim=1))
+            x_ = F.interpolate(x_, size=x_rgb_1.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv1(torch.cat((x_rgb_1, x_ir_1), dim=1))
+            x_ = F.interpolate(x_, size=x_rgb_0.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv0(torch.cat((x_rgb_0, x_ir_0), dim=1))
         x_ = self.final_layer(x_)
         
         if self.augment: 
