@@ -155,20 +155,8 @@ class PIDNet(nn.Module):
             return 1
         return 0
 
-    def make_input(self, x):
-        B, N, H, W = x.size()
-        x_new = torch.zeros((B, self.channels, H, W), dtype=x.dtype, device=x.device)
-        for b in range(B):
-            for n in range(N // 3):
-                img = x[b, n*3:(n+1)*3]
-                if self.find_mode(img) == 1:
-                    x_new[b, -1] = img[0]
-                else:
-                    x_new[b, :3] = img
-        return x_new
 
-    def forward(self, x):
-        x = self.make_input(x)
+    def forward(self, x, tf=None):
         x = self.conv1(x)
         x = self.layer1(x)
         x = self.relu(self.layer2(self.relu(x)))
@@ -211,7 +199,7 @@ class PIDNet(nn.Module):
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             x_extra_d = self.seghead_d(temp_d)
-            return [x_extra_p, x_, x_extra_d]
+            return [x_extra_p, x_, x_extra_d, None]
         else:
             return x_
     

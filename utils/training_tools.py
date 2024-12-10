@@ -39,7 +39,8 @@ class Trainer:
                 param.requires_grad = False
             for param in model.robust_module.parameters():
                 param.requires_grad = True
-            conv_rob = [*(model.conv0_rob.parameters()), *(model.conv1_rob.parameters()), *(model.conv2_rob.parameters())]
+            conv_rob = [*(model.conv1_rgb_0_rob.parameters()), *(model.conv1_rgb_0_rob.parameters()), *(model.conv1_rgb_1_rob.parameters()), \
+                        *(model.conv1_rgb_2_rob.parameters()), *(model.layer1_rgb_rob.parameters()), *(model.layer2_rgb_rob.parameters()) ]
             for param in conv_rob:
                 param.requires_grad = True
             

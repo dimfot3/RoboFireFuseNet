@@ -349,10 +349,8 @@ class TotalLoss:
         robust_out, outputs = outputs[-1], outputs[:-1]
         if tf != None:
             x_ir, x_ir_new, x_rgb_ir, tf_pred = robust_out
-            maskout = torch.repeat_interleave(F.interpolate(torch.tensor((labels == self.ignore_label).to(torch.float)).unsqueeze(1), \
-                                    x_ir_new.shape[-2:], mode='nearest').to(torch.bool), x_rgb_ir.shape[1], 1)
-            x_rgb_ir, x_ir_new, x_ir = x_rgb_ir * (~maskout), x_ir_new * (~maskout), x_ir * (~maskout)
-            loss +=   self.kl_divergence_loss(x_rgb_ir, x_ir)
+            loss += 100*self.affine_loss(tf_pred, tf)
+            # print(self.affine_loss(tf_pred, tf))
             #         0.0 * self.transformation_consistency_loss(x_ir_new, x_ir, tf) + \
             #         0.0 * self.cosine_similarity_loss(x_ir_new, x_rgb_ir) + \
             #         0.0 * self.mse_loss(x_ir_new, x_rgb_ir) + \
@@ -374,7 +372,7 @@ class TotalLoss:
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
-        loss += (loss_s if not torch.isnan(loss_sb) else 0)  + (loss_b if not torch.isnan(loss_sb) else 0) + (loss_sb if not torch.isnan(loss_sb) else 0) # + loss_miou
+        loss += 0.6 * ((loss_s if not torch.isnan(loss_sb) else 0)  + (loss_b if not torch.isnan(loss_sb) else 0) + (loss_sb if not torch.isnan(loss_sb) else 0)) # + loss_miou
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
 

@@ -69,10 +69,25 @@ class PIDnetTF(nn.Module):
         input_resolution = np.array(input_resolution)
         self.robust_module =  None
         if robust_module:
-            self.robust_module = RobustModule(2*planes)
-            self.conv0_rob = nn.Sequential(nn.Conv2d(in_channels=planes, out_channels=planes, kernel_size=3, padding=1))
-            self.conv1_rob = nn.Sequential(nn.Conv2d(in_channels=planes, out_channels=planes, kernel_size=3, padding=1))
-            self.conv2_rob = nn.Sequential(nn.Conv2d(in_channels=planes, out_channels=planes, kernel_size=3, padding=1))
+            self.robust_module = RobustModule(planes*2, h=input_resolution[0]//8, w=input_resolution[1]//8)
+            self.conv1_rgb_0_rob =  nn.Sequential(
+                          nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
+                          nn.GroupNorm(8, planes),
+                          nn.ReLU(inplace=True),
+                      )
+            self.conv1_rgb_1_rob =  nn.Sequential(
+                            nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                            nn.GroupNorm(8, planes),
+                            nn.ReLU(inplace=True),
+                        )
+            self.conv1_rgb_2_rob =  nn.Sequential(
+                            nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
+                            BatchNorm2d(planes, momentum=bn_mom),
+                            nn.ReLU(inplace=True),
+                        )
+            self.layer1_rgb_rob = self._make_layer(BasicBlock, planes, planes, m)
+            self.layer2_rgb_rob = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
+
         # I Branch
         self.conv1_rgb_0 =  nn.Sequential(
                           nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
@@ -89,6 +104,8 @@ class PIDnetTF(nn.Module):
                           BatchNorm2d(planes, momentum=bn_mom),
                           nn.ReLU(inplace=True),
                       )
+        
+
         self.conv1_ir_0 =  nn.Sequential(
                           nn.Conv2d(1,planes, kernel_size=3, stride=1, padding=1),
                           nn.GroupNorm(8, planes),
@@ -291,12 +308,7 @@ class PIDnetTF(nn.Module):
         x_rgb = x_rgb_3
 
         # layer0 ir
-        x_irinp = x[:, -1:]
-        # tf[:, :, 2] = tf[:, :, 2]
-        
-        # grid = F.affine_grid(tf, x_irinp.size(), align_corners=True)
-        # x_irinp = F.grid_sample(x_irinp, grid, align_corners=True)
-        
+        x_irinp = x[:, -1:]   
         x_ir_0 = self.conv1_ir_0(x_irinp)
         x_ir_1 = self.conv1_ir_1(x_ir_0)
         x_ir_2 = self.conv1_ir_2(x_ir_1)
@@ -306,22 +318,21 @@ class PIDnetTF(nn.Module):
         x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
         x_ir = x_ir_3
         
-        if self.robust_module != None:
-            x_ir_new, x_rgb_ir, tf = self.robust_module(x_rgb, x_ir, tf=None)
-            # tf = torch.tensor([[1, 0, 0],[0, 1, 0]], dtype=torch.float32).to(x_ir.device).unsqueeze(0).repeat(x_ir_new.shape[0], 1, 1)
+        if self.robust_module is not None:
+            x_ir_new, x_rgb_ir, tf_new = self.robust_module(x_rgb, x_ir, tf=None)
+            tf = tf_new #if tf is None else tf
             x_inter = [x_ir, x_ir_new, x_rgb_ir, tf]
-            x_ir, x_ir_3 = x_rgb_ir, x_rgb_ir
-            # grid = F.affine_grid(tf, x_ir.size(), align_corners=False)
-            # x_ir = F.grid_sample(x_ir, grid, align_corners=False) + x_ir_new
-            x_ir_1 = x_ir_1 * 0
-            x_ir_2 = x_ir_2 * 0
-            x_ir_0 = x_ir_0 * 0
-            # grid = F.affine_grid(tf, x_ir_0.size(), align_corners=False)
-            # x_ir_0 = self.conv0_rob(F.grid_sample(x_ir_0, grid, align_corners=False))
-            # grid = F.affine_grid(tf, x_ir_1.size(), align_corners=False)
-            # x_ir_1 = self.conv1_rob(F.grid_sample(x_ir_1, grid, align_corners=False))
-            # grid = F.affine_grid(tf, x_ir_2.size(), align_corners=False)
-            # x_ir_2 = self.conv2_rob(F.grid_sample(x_ir_2, grid, align_corners=False))
+            grid = F.affine_grid(tf, x_irinp.size(), align_corners=False)
+            x_irinp = F.grid_sample(x_irinp, grid, mode='nearest', align_corners=False, padding_mode='zeros')
+            x_ir_0 = self.conv1_ir_0(x_irinp)
+            x_ir_1 = self.conv1_ir_1(x_ir_0)
+            x_ir_2 = self.conv1_ir_2(x_ir_1)
+            # layer1 ir
+            x_ir_2 = self.layer1_ir(x_ir_2)
+            # layer2 ir
+            x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
+            x_ir = x_ir_3
+            x_inter = [x_ir, x_ir_new, x_rgb_ir, tf]
 
 
         x = self.weight_channels_pre(torch.cat((x_rgb, x_ir), dim=1))
@@ -335,7 +346,6 @@ class PIDnetTF(nn.Module):
         x = self.layer3_unpatch(x_patched)
         x_rgb = self.relu(self.layer3_rgb(x_rgb))
         x_ir = self.relu(self.layer3_ir(x_ir))
-        
         x_ = self.pag3(x_, self.compression3(x))
         
         x_d = x_d + F.interpolate(
@@ -348,6 +358,7 @@ class PIDnetTF(nn.Module):
         x = self.layer4(x_patched)
         x_rgb = self.relu(self.layer4_rgb(x_rgb))
         x_ir = self.relu(self.layer4_ir(x_ir))
+
         x_ = self.layer4_(self.relu(x_))
         x_d = self.layer4_d(self.relu(x_d))
         x_ = self.pag4(x_, self.compression4(x))
@@ -431,21 +442,21 @@ def custom_pretrained(input_res, num_classes, depths, windows_size):
 
 from time import time
 if __name__ == '__main__':
-    device = 'cpu'
+    device = 'cuda'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
     windows_size = 8
-    input_res = (480, 640)
+    input_res = (480, 480)
     num_classes = 9
     depths= [2, 6]
-    model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths).cuda()
+    model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths, robust_module=True).cuda()
     model.eval()
     # model = custom_pretrained(input_res, num_classes, depths, windows_size).cuda().eval()
-    # summary(model, torch.randn(1, 4, *input_res), depth=30, device=device)
+    summary(model, torch.randn(1, 4, *input_res), depth=30, device=device)
     avg = 0
     for i in range(100):
         t0 = time()
-        tmp = model(torch.randn(1, 4, *input_res).cuda())
+        tmp = model(torch.randn(1, 4, *input_res).to(device))
         t1 = time()
         if i > 20:
             avg += (t1 - t0)/ 80
