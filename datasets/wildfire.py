@@ -146,7 +146,7 @@ class WildFire(BaseDataset):
             _, scale, trans, theta = self.random_transformation_matrix()
             loaded_images, label, inv_tf = self.transform_image(loaded_images, label, angle=theta, scale=scale, translate=trans)
         # if True:
-        #     scale, trans, theta = 1 + 0.08, np.array([0, 0]), (0/180) * np.pi
+        #     scale, trans, theta = 1+0.08, np.array([0, 0]), (0/180) * np.pi
         #     loaded_imagestmp1, _, inv_tf = self.transform_image(loaded_images, label, angle=theta, scale=scale, translate=trans)
         #     loaded_imagestmp2, _, _ = self.transform_image(loaded_images[::-1], label, angle=-theta, scale=1/scale, translate=-trans)
         #     loaded_images[1] = loaded_imagestmp1[1]
@@ -214,8 +214,8 @@ class WildFire(BaseDataset):
         ], dtype=torch.float64)
         
         # Combined transformation: scale -> rotate -> translate
-        transformation_matrix =  translation_matrix @ rotation_matrix @ scaling_matrix
-        inv_transformation_matrix = inv_scaling_matrix @ inv_rotation_matrix @ inv_translation_matrix
+        transformation_matrix =  scaling_matrix @ rotation_matrix @ translation_matrix
+        inv_transformation_matrix = inv_translation_matrix @ inv_rotation_matrix @ inv_scaling_matrix
         transformation_matrix = transformation_matrix[:2, :] 
         inv_transformation_matrix = inv_transformation_matrix[:2, :]
         # Create affine grid

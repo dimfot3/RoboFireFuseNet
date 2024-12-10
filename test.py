@@ -24,8 +24,8 @@ def test(trainer, test_dataset, args, logger):
     logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
     print('-'*shutil.get_terminal_size()[0])
     # logger.print_metrics(metrics_inst, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
-    qualitive_eval2(lambda data: trainer.inference(data), test_dataset, 
-                   ex_path=f'./outputs/{args["PROJECTNAME"]}/{args["SESSIONAME"]}/visualizations', name=f'TEST.png')
+    # qualitive_eval2(lambda data: trainer.inference(data), test_dataset, 
+    #                ex_path=f'./outputs/{args["PROJECTNAME"]}/{args["SESSIONAME"]}/visualizations', name=f'TEST.png')
     return metrics
 
 def main(args):
