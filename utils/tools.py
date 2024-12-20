@@ -80,12 +80,12 @@ def parse_args():
     parser.add_argument('--EPOCHS', type=int, help='Number of Epochs')
     parser.add_argument('--DEVICE', type=str, help='Device "cpu" or "cuda"')
     parser.add_argument('--STOPCOUNTER', type=int, help='Stop counter')
-    parser.add_argument('--MAX_FR_APART', type=int, help='Maximum frame difference for the n frames')
     parser.add_argument('--ONLINELOG', type=str2bool, help='Online Log in weight and biases')
     parser.add_argument('--ROBUST_TRAIN', type=str2bool, help='wether to use robust training')
     parser.add_argument('--PRETRAINED', type=str, help='full path to pretrain weights')
     parser.add_argument('--OPTIM', type=str, help='Optimizer')
     parser.add_argument('--SCHED', type=str, help='Scheduler')
+    
     args = parser.parse_args()
     args = {key: value for key, value in vars(args).items() if value is not None}
     with open('config/' + args['yaml_file'], 'r') as file:
