@@ -32,7 +32,7 @@ and high-stakes environments.
 
 ## Highlights
 
-- 🔥 <b>Lightweight & Powerful Multimodal Segmentation</b>: Our real-time fusion model outperforms many SOTA models with fewer parameters.
+- 🔥 <b>Lightweight & Powerful Multimodal Segmentation</b>: Our real-time fusion model outperforms many SOTA models with fewer parameters in segmentation task with visible and thermal imaging.
 - 🚁 <b>Smoke & Flame Segmentation</b>: Excels in dense smoke conditions, accurately segmenting concurently flames and smoke.
 - 🛠️ <b>Robust Fusion</b>: Handles modality misalignment and sensor failures achieving semantic segmentation fusing unregistered inputs.
    
