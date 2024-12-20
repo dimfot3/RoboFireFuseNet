@@ -1,8 +1,8 @@
 # general
-PROJECTNAME: 'AsyncSearchv0'
-SESSIONAME: 'inter_fuserw16'
+PROJECTNAME: 'Urban'
+SESSIONAME: 'test'
 DEVICE: 'cuda:0'
-NUM_WORKERS: 3
+NUM_WORKERS: 10
 ONLINELOG: True
 SEED: 200
 STOPCOUNTER: 400
@@ -10,15 +10,15 @@ VALID_FREQ: 2
 WARMUP: 20
 ROBUST_TRAIN: False
 # model
-MODEL: 'async2_s'
+MODEL: 'robofire'
 NUM_OUTPUTS: 2
-PRETRAINED: "weights/pretrained_480x640_w16_2_6.pth"
+PRETRAINED: "weights/pretrained_480x640_w8_2_6.pth"
 CHECKPOINT: null
-WINDOW_SIZE: 16
+WINDOW_SIZE: 8
 TF_CONFIG: [2, 6]
 # data
 TRAINSET: 'lists/train_mfnet.txt'
-VALIDSET: 'lists/test_mfnet.txt'
+VALIDSET: 'lists/val_mfnet.txt'
 TESTSET: 'lists/test_mfnet.txt'
 ROOTDATASET: '../Datasets/'
 NUM_CLASSES: 9
