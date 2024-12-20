@@ -99,15 +99,18 @@ class Trainer:
         loss = losses.mean()
         return loss.detach(), conf_mat
 
-    def inference(self, data):
+    def inference(self, data, proc_output=True):
         self.model.eval()
         images = data.to(dtype=torch.float, device=self.device)
         output = self.model(images)
-        output = F.interpolate(
-                            output[1],
-                            size=[images.shape[-2], images.shape[-1]],
-                            mode='bilinear', align_corners=True)
-        output = torch.argmax(output, dim=1)
+        if proc_output:
+            if(len(output) > 1):
+                output = output[1]
+            output = F.interpolate(
+                                output,
+                                size=[images.shape[-2], images.shape[-1]],
+                                mode='bilinear', align_corners=True)
+            output = torch.argmax(output, dim=1)
         return output
 
     def get_optimizer(self, args, model):
