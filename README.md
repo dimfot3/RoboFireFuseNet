@@ -26,11 +26,10 @@ enhanced robustness suitable for robotic applications in dynamic
 and high-stakes environments.
 
 ## Highlights
- - Collection and annotation a dataset of paired RGB and Long Wave Infrared (LWIR) images from FLAME2 [[2]](#2) and a dataset of wildfires in Finland forests
- - Comparison of RGB and IR imaging for flame and smoke segmentation based on PIDnet [[1]](#1), a state-of-the-art architecture model
- - Comparison of different fusion techniques on urban dataset and FLAME2
- - Proposed a novel architecture that achieves performance comparamble to state of the art while remaining real time
- - Proposed a novel module that can handle unregisted rgb and infrared inputs and fist achieving unregistered fusion semantic segmentation
+
+- 🔥 <b>Lightweight & Powerful</b>: Our real-time fusion model outperforms many SOTA models with fewer parameters.
+- 🚁 <b>Smoke & Flame Segmentation</b>: Excels in dense smoke conditions, accurately segmenting flames and smoke.
+- 🛠️ <b>Robust Fusion</b>: Handles modality misalignment and sensor failures achieving semantic segmentation fusing unregistered inputs.
    
 ## Updates
 - Paper is submitted to ...
@@ -43,8 +42,33 @@ Schematic overview of the proposed Multisclae Intermediate Feature Fusion (MIFF)
 
 
 ## Models
-# table of resutyls
 
+### 📊 **Performance Comparison on Urban Scenes (MFNet)**
+| **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
+|--------------------------|-------------------|---------------|-----------------|
+| [PIDNet-m RGB](https://example.com)  | 65.59            | 51.52         | 34.4            |
+| [PIDNet-m IR](https://example.com)   | 65.27            | 50.70         | 34.4            |
+| [PIDNet-m Early](https://example.com) | 69.59            | 52.62         | 34.4            |
+| [MFNet](https://example.com)          | 59.1             | 39.7          | **0.73**         |
+| [RTFNet](https://example.com)        | 63.08            | 53.2          | 185.24          |
+| [GMNet](https://example.com)        | **74.1**         | 57.3          | 153             |
+| [EGFNet](https://example.com)       | 72.7             | 54.8          | 62.5            |
+| [CRM-T](https://example.com)        | -                | 59.7          | 59.1            |
+| [Sigma-T](https://example.com)       | 71.3             | 60.23         | 48.3            |
+| **Ours**                                             | 71.1             | **60.6**      | 29.5            |
+### 📊 **Performance Comparison on FLAME2**
+| **Method**                | **Avg Recall (%)** | **MIoU (%)** |
+|--------------------------|-------------------|---------------|
+| [PIDNet-RGB](https://example.com)  | 75.66            | 61.21         |
+| [PIDNet-IR](https://example.com)   | 83.05            | 58.71         |
+| [PIDNet-Early](https://example.com) | 88.25            | 73.90         |
+| [MFNet](https://example.com)        | 93.53            | 80.26         |
+| [RTFNet](https://example.com)      | 73.87            | 65.42         |
+| [GMNet](https://example.com)      | 67.53            | 54.08         |
+| [EGFNet](https://example.com)     | 74.27            | 60.98         |
+| [CRM-T](https://example.com)      | -                | -             |
+| [Sigma-T](https://example.com)     | 92.6             | 86.27         |
+| **Ours**                                           | **94.34**        | **88.39**     |
 
 ## Usage
 
