@@ -25,6 +25,11 @@ them in wildfire scenarios, offering real-time capabilities and
 enhanced robustness suitable for robotic applications in dynamic
 and high-stakes environments.
 
+<div align="center">
+   <h4>MIOU vs FPS on MFNet dataset and RTX 4090</h4>
+  <img src="figs/mioufps.png" alt="Model Architecture" width="400"/>
+</div>
+
 ## Highlights
 
 - 🔥 <b>Lightweight & Powerful</b>: Our real-time fusion model outperforms many SOTA models with fewer parameters.
@@ -38,10 +43,13 @@ and high-stakes environments.
 
 
 ## Overview
-Schematic overview of the proposed Multisclae Intermediate Feature Fusion (MIFF) model
+Schematic overview of the proposed fusion model and the robust module.
 
+### Fusion Architecture
+<img src="figs/mymodel.png" alt="Model Architecture" width="700"/>
 
-## Models
+### Robust module
+<img src="figs/robust.png" alt="Model Architecture" width="400"/>
 
 ### 📊 **Performance Comparison on Urban Scenes (MFNet)**
 | **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
@@ -57,18 +65,18 @@ Schematic overview of the proposed Multisclae Intermediate Feature Fusion (MIFF)
 | [Sigma-T](https://example.com)       | 71.3             | 60.23         | 48.3            |
 | **Ours**                                             | 71.1             | **60.6**      | 29.5            |
 ### 📊 **Performance Comparison on FLAME2**
-| **Method**                | **Avg Recall (%)** | **MIoU (%)** |
-|--------------------------|-------------------|---------------|
-| [PIDNet-RGB](https://example.com)  | 75.66            | 61.21         |
-| [PIDNet-IR](https://example.com)   | 83.05            | 58.71         |
-| [PIDNet-Early](https://example.com) | 88.25            | 73.90         |
-| [MFNet](https://example.com)        | 93.53            | 80.26         |
-| [RTFNet](https://example.com)      | 73.87            | 65.42         |
-| [GMNet](https://example.com)      | 67.53            | 54.08         |
-| [EGFNet](https://example.com)     | 74.27            | 60.98         |
-| [CRM-T](https://example.com)      | -                | -             |
-| [Sigma-T](https://example.com)     | 92.6             | 86.27         |
-| **Ours**                                           | **94.34**        | **88.39**     |
+| **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
+|--------------------------|-------------------|---------------|-----------------|
+| [PIDNet-RGB](https://example.com)  | 75.66            | 61.21         | 34.4            |
+| [PIDNet-IR](https://example.com)   | 83.05            | 58.71         | 34.4            |
+| [PIDNet-Early](https://example.com) | 88.25            | 73.90         | 34.4            |
+| [MFNet](https://example.com)        | 93.53            | 80.26         | **0.73**         |
+| [RTFNet](https://example.com)      | 73.87            | 65.42         | 185.24          |
+| [GMNet](https://example.com)      | 67.53            | 54.08         | 153             |
+| [EGFNet](https://example.com)     | 74.27            | 60.98         | 62.5            |
+| [CRM-T](https://example.com)      | -                | -             | 59.1            |
+| [Sigma-T](https://example.com)     | 92.6             | 86.27         | 48.3            |
+| **Ours**                            | **94.34**        | **88.39**     | 29.5            |
 
 ## Usage
 
