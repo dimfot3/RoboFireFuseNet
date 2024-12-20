@@ -46,9 +46,13 @@ and high-stakes environments.
 Schematic overview of the proposed fusion model and the robust module.
 
 ### Fusion Architecture
+Our model builds on PIDNet-Small by integrating SwinV2-T Transformer blocks to enhance capacity and capture long-range dependencies. We introduce dual modality paths to preserve and mine modality-specific features, and replace simple upscaling with a U-Net style decoder using shortcut connections. This design restores spatial dimensions while retaining essential small-scale features for improved segmentation.
+
 <img src="figs/mymodel.png" alt="Model Architecture" width="700"/>
 
 ### Robust module
+The optional, lightweight robustness module enhances modality alignment by iteratively estimating the optimal affine transformation to align Infrared and RGB modalities. It leverages cross-attention between the two modalities to generate a misalignment-aware map, ensuring more accurate feature fusion and improved robustness.
+
 <img src="figs/robust.png" alt="Model Architecture" width="400"/>
 
 ### 📊 **Performance Comparison on Urban Scenes (MFNet)**
