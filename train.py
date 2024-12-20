@@ -5,9 +5,7 @@ from tqdm import tqdm
 from utils.tools import *
 from utils.training_tools import *
 from utils.logger import Logger
-import warnings
 
-warnings.filterwarnings("ignore", message="UserWarning")
 
 def train(model, train_data, val_data, args, logger):
     train_loader = DataLoader(train_data, batch_size=args['BATCHSIZE'], shuffle=True, num_workers=args['NUM_WORKERS'], prefetch_factor=1, drop_last=True,

@@ -296,37 +296,8 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
         non_bg_idxs = outputs!=0
         outputs = val_data.label2color(outputs)
-        images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
+        # images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
-    os.makedirs(ex_path, exist_ok=True)
-    plt.savefig(os.path.join(ex_path, name))
-    plt.close(f)
-
-def qualitive_eval_pretrain(inf_model, val_data, ex_path='./outputs', name='example.png'):
-    """
-    Perform qualitative evaluation of the segmentation model and save the results.
-
-    Parameters:
-    inf_model (torch.nn.Module): The model used for inference.
-    val_data (Dataset): The validation dataset containing images and labels.
-    ex_path (str, optional): The directory path where output images will be saved. Defaults to './outputs'.
-    name (str, optional): The filename for the saved output image. Defaults to 'example.png'.
-
-    Returns:
-    None
-    """
-    valid_loader = iter(DataLoader(val_data, batch_size=1, shuffle=True))
-    f, ax = plt.subplots(1, 5, figsize=(20, 2.5))
-    for sampleid in range(5):
-        batch = next(valid_loader)
-        images, labels, mask = batch[0], batch[1], np.transpose(batch[2][0].detach().cpu().numpy(), (1, 2, 0))
-        outputs = inf_model(images)
-        images = (np.transpose(labels[0].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) 
-                  + np.array([0.485, 0.456, 0.406])).clip(0, 1)
-        outputs = (np.transpose(outputs[0].detach().cpu().numpy(), (1, 2, 0))* np.array([0.229, 0.224, 0.225]) 
-                  + np.array([0.485, 0.456, 0.406])).clip(0, 1)
-        images[mask.sum(axis=-1) > 0] = outputs[mask.sum(axis=-1) > 0]
-        ax[sampleid].imshow(images, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))
     plt.close(f)

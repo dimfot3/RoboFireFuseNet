@@ -1,39 +1,39 @@
 # general
-PROJECTNAME: 'AsyncSearchv0'
-SESSIONAME: 'wildfire_wild_output'
-DEVICE: 'cuda:1'
+PROJECTNAME: 'testing'
+SESSIONAME: 'testing'
+DEVICE: 'cuda:0'
 NUM_WORKERS: 1
-ONLINELOG: True
+ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 50
 VALID_FREQ: 2
 WARMUP: 20
 ROBUST_TRAIN: False
 # model
-MODEL: 'async2_s'
+MODEL: 'robofire'
 NUM_OUTPUTS: 2
-PRETRAINED: 'weights/AsyncSearchv0/wildfire_mask/checkpoint_epoch_108.pth'
+PRETRAINED: 'weights/pretrained_480x640_w8_2_6.pth'
 CHECKPOINT: null
 WINDOW_SIZE: 8
 TF_CONFIG: [2, 6]
 # data
-TRAINSET: 'lists/train_flm.txt'
-VALIDSET: 'lists/test_flm.txt'
-TESTSET: 'lists/test_flm.txt'
+TRAINSET: 'lists/test_fin.txt'
+VALIDSET: 'lists/test_fin.txt'
+TESTSET: 'lists/test_fin.txt'
 ROOTDATASET: '../Datasets/'
 NUM_CLASSES: 3
 CLS_NAMES: ['background', 'smoke', 'fire']
 MODE: 'fusion'
-MULTISCALE: False
-FLIP: False
+MULTISCALE: True
+FLIP: True
 BRIGHTNESS: True
-SINGLE_SOURCE: False
-COMP_MASK: False
+SINGLE_SOURCE: True
+COMP_MASK: True
 BLEND_IMGS: True
 IGNORE_LABEL: 255
 SCALE_FACTOR: 10
-CROP_SIZE: [256, 256]
-BASE_SIZE: 256
+CROP_SIZE: [180, 320]
+BASE_SIZE: 320
 CLASS_WEIGHTS: [2.27681343, 3.04257527, 8.8657764]
 ALIGN_CORNERS: True
 # loss and optimization

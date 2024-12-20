@@ -8,7 +8,7 @@ from .scheduler import CosineDecay, PolynomialDecayLR
 import torch.optim as optim
 from models.pidnet import PIDNet
 from datasets.wildfire import WildFire
-from models.Asyncv3 import PIDnetTF
+from models.robofirefusenet import RoboFireFuseNet
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -231,11 +231,8 @@ def get_model(args):
         model = PIDNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']])
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=channels[args['MODE']])
-    elif 'async2_s' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'], robust_module=args['ROBUST_TRAIN'])
-    elif 'async2_m' == args['MODEL']:
-        model = PIDnetTF(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'], robust_module=args['ROBUST_TRAIN'])
-    
+    elif 'robofire' == args['MODEL']:
+        model = RoboFireFuseNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'], robust_module=args['ROBUST_TRAIN'])
     if args['PRETRAINED'] is not None:
         model.imgnet_pretrain(args['PRETRAINED'])
     model.to(device=args['DEVICE'])
