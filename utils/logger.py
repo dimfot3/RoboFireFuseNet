@@ -108,38 +108,3 @@ class Logger:
         
         print(f"Best Epoch {self.best_epoch}: MIOU {self.best_miou}\n")
 
-
-class PreTrainingLogger:
-    def __init__(self, args, model=None):
-        self.best_loss, self.best_epoch = 1e10, 0        # this is a logger metric
-        self.online_log = args['ONLINELOG']
-        if self.online_log:
-            self.wdb_log = WDBLogger(args, model, sync_tensorboard=True)
-        self.tensor_log = TensorBoardLogger(args, model)
-    
-    def log(self, metrics, epoch, scheduler):
-        # this logs best metric
-        if 'loss' in list(metrics.keys()):
-            if metrics['loss'] < self.best_loss:
-                self.best_loss, self.best_epoch = metrics['loss'], epoch
-        metrics['global_step'] = epoch
-        self.tensor_log.log(metrics, epoch, scheduler)
-        if self.online_log:
-            self.wdb_log.log(metrics, epoch, scheduler)
-
-    def close(self):
-        self.tensor_log.close()
-        if self.online_log:
-            self.wdb_log.close()
-    
-    def add_hyperparams(self, params, metrics):
-        self.tensor_log.writer.add_hparams(params, metrics, run_name='./')
-
-    def print_metrics(self, metrics):
-        avgloss = metrics.get(f'loss', 0)
-
-
-        print("Average Metrics:")
-        print(f" - Average Loss: {avgloss:.4f}")
-
-        print(f"Best Epoch {self.best_epoch}: MIOU {self.best_loss}\n")
