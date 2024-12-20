@@ -4,7 +4,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import time
+from time import time
 import numpy as np
 import sys
 sys.path.insert(0, './models/')
@@ -21,6 +21,7 @@ from pidnet import PIDNet
 from robust_module import RobustModule
 bn_mom = 0.1
 algc = False
+from thop import profile
 
 modality_paths = True
 short_path = True
@@ -62,6 +63,16 @@ class ChannelAttentionModule(nn.Module):
         
         return x
 
+def drop_path(x, drop_prob=0.2, training=True):
+    if drop_prob == 0. or not training:
+        return x
+    batch_size = x.shape[0]
+    keep_prob = 1 - drop_prob
+    random_tensor = keep_prob + torch.rand(batch_size, 1, 1, 1, device=x.device)
+    binary_mask = random_tensor.floor()
+    x = x / keep_prob * binary_mask
+    return x
+
 class PIDnetTF(nn.Module):
 
     def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), tf_depths=(2, 6), robust_module=False):
@@ -72,23 +83,10 @@ class PIDnetTF(nn.Module):
         self.planes = planes
         input_resolution = np.array(input_resolution)
         self.robust_module =  None
+        self.drop_paths_modalities = [0.2, 0.2, 0]     # rgb, ir, fusion
+        self.drop_paths_shortcuts = [0.15, 0.15, 0.15, 0.15]    # 0, 1, 2
         if robust_module:
             self.robust_module = RobustModule(planes*2, h=input_resolution[0]//8, w=input_resolution[1]//8)
-            self.conv1_rgb_0_rob =  nn.Sequential(
-                          nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
-                          nn.GroupNorm(8, planes),
-                          nn.ReLU(inplace=True),
-                      )
-            self.conv1_rgb_1_rob =  nn.Sequential(
-                            nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
-                            nn.GroupNorm(8, planes),
-                            nn.ReLU(inplace=True),
-                        )
-            self.conv1_rgb_2_rob =  nn.Sequential(
-                            nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
-                            BatchNorm2d(planes, momentum=bn_mom),
-                            nn.ReLU(inplace=True),
-                        )
             self.layer1_rgb_rob = self._make_layer(BasicBlock, planes, planes, m)
             self.layer2_rgb_rob = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
 
@@ -387,7 +385,10 @@ class PIDnetTF(nn.Module):
         x_d = self.layer5_d(self.relu(x_d))
         
         if modality_paths:
-            x = self.weight_channels_post(torch.cat([self.layer5(x), self.layer5_rgb(x_rgb), self.layer5_ir(x_ir)], dim=1))  # channel attention
+            path_id = torch.randint(0, 3, (1,), device=x.device).item()
+            x = self.weight_channels_post(torch.cat([drop_path(self.layer5(x), self.drop_paths_modalities[2] * (0 if path_id == 2 else 1), self.training), \
+                                                     drop_path(self.layer5_rgb(x_rgb), self.drop_paths_modalities[0] * (0 if path_id == 0 else 1), self.training), \
+                                                     drop_path(self.layer5_ir(x_ir), self.drop_paths_modalities[1]* (0 if path_id == 1 else 1), self.training)], dim=1))
         else:
             x = self.layer5(x)
 
@@ -398,10 +399,14 @@ class PIDnetTF(nn.Module):
 
         x_ = self.dfm(x_, x, x_d)
         if short_path:
-            x_ = F.interpolate(x_, size=x_rgb_3.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv3(torch.cat((x_rgb_3, x_ir_3), dim=1))
-            x_ = F.interpolate(x_, size=x_rgb_2.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv2(torch.cat((x_rgb_2, x_ir_2), dim=1))
-            x_ = F.interpolate(x_, size=x_rgb_1.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv1(torch.cat((x_rgb_1, x_ir_1), dim=1))
-            x_ = F.interpolate(x_, size=x_rgb_0.shape[-2:], mode='bilinear', align_corners=algc) + self.tf_conv0(torch.cat((x_rgb_0, x_ir_0), dim=1))
+            x_ = F.interpolate(x_, size=x_rgb_3.shape[-2:], mode='bilinear', align_corners=algc) + \
+                drop_path(self.tf_conv3(torch.cat((x_rgb_3, x_ir_3), dim=1)), self.drop_paths_shortcuts[3], self.training)
+            x_ = F.interpolate(x_, size=x_rgb_2.shape[-2:], mode='bilinear', align_corners=algc) + \
+                drop_path(self.tf_conv2(torch.cat((x_rgb_2, x_ir_2), dim=1)), self.drop_paths_shortcuts[2], self.training)
+            x_ = F.interpolate(x_, size=x_rgb_1.shape[-2:], mode='bilinear', align_corners=algc) + \
+                drop_path(self.tf_conv1(torch.cat((x_rgb_1, x_ir_1), dim=1)), self.drop_paths_shortcuts[1], self.training)
+            x_ = F.interpolate(x_, size=x_rgb_0.shape[-2:], mode='bilinear', align_corners=algc) + \
+                drop_path(self.tf_conv0(torch.cat((x_rgb_0, x_ir_0), dim=1)), self.drop_paths_shortcuts[0], self.training)
         x_ = self.final_layer(x_)
         
         if self.augment: 
@@ -460,17 +465,43 @@ def custom_pretrained(input_res, num_classes, depths, windows_size):
 
 from time import time
 if __name__ == '__main__':
-    device = 'cuda'
+    device = 'cuda:0'
     # Comment batchnorms here and in model_utils before testing speed since the batchnorm could be integrated into conv operation
     # (do not comment all, just the batchnorm following its corresponding conv layer)
     windows_size = 8
-    input_res = (480, 480)
-    num_classes = 9
+    input_res = (256, 256)
+    num_classes = 3
     depths= [2, 6]
-    model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths, robust_module=True).cuda()
+    
+    model = PIDnetTF(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths, robust_module=False).to(device)
     model.eval()
     # model = custom_pretrained(input_res, num_classes, depths, windows_size).cuda().eval()
-    summary(model, torch.randn(1, 4, *input_res), depth=30, device=device)
+    input = torch.randn(1, 4, *input_res).to(device)
+    # flops, params = profile(model, inputs=(input, ))
+    # print(f"Total FLOPs: {flops / 1e9} GFLOPs")
+
+    # # Step 2: Measure Execution Time
+    # with torch.autocast(device_type=device, dtype=torch.float32, enabled=True):
+    #     # Warm-up
+    #     for _ in range(20):
+    #         _ = model(input)
+        
+    #     # Measure time for a single forward pass
+    #     avg = 0
+    #     for _ in range(20):
+    #         start_time = time()
+    #         _ = model(input)
+    #         end_time = time()
+    #         avg += (end_time-start_time) / 20
+
+    # execution_time = avg
+    # print(f"Execution time for one forward pass: {execution_time:.6f} seconds")
+
+    # # Step 3: Calculate GFLOPS
+    # gflops = flops / (execution_time * 1e9)
+    # print(f"GFLOPS: {gflops:.2f}")
+
+    # summary(model, torch.randn(1, 4, *input_res), depth=90, device=device)
     avg = 0
     for i in range(100):
         t0 = time()
