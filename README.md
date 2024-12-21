@@ -58,28 +58,28 @@ The optional, lightweight robustness module enhances modality alignment by itera
 ### 📊 **Performance Comparison on Urban Scenes (MFNet)**
 | **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
 |--------------------------|-------------------|---------------|-----------------|
-| [PIDNet-m RGB](https://example.com)  | 65.59            | 51.52         | 34.4            |
-| [PIDNet-m IR](https://example.com)   | 65.27            | 50.70         | 34.4            |
-| [PIDNet-m Early](https://example.com) | 69.59            | 52.62         | 34.4            |
-| [MFNet](https://example.com)          | 59.1             | 39.7          | **0.73**         |
-| [RTFNet](https://example.com)        | 63.08            | 53.2          | 185.24          |
-| [GMNet](https://example.com)        | **74.1**         | 57.3          | 153             |
-| [EGFNet](https://example.com)       | 72.7             | 54.8          | 62.5            |
-| [CRM-T](https://example.com)        | -                | 59.7          | 59.1            |
-| [Sigma-T](https://example.com)       | 71.3             | 60.23         | 48.3            |
+| [PIDNet-m RGB](https://github.com/XuJiacong/PIDNet)  | 65.59            | 51.52         | 34.4            |
+| [PIDNet-m IR](https://github.com/XuJiacong/PIDNet)   | 65.27            | 50.70         | 34.4            |
+| [PIDNet-m Early](https://github.com/XuJiacong/PIDNet) | 69.59            | 52.62         | 34.4            |
+| [MFNet](https://github.com/haqishen/MFNet-pytorch)          | 59.1             | 39.7          | **0.73**         |
+| [RTFNet](https://github.com/yuxiangsun/RTFNet)        | 63.08            | 53.2          | 185.24          |
+| [GMNet](https://github.com/Jinfu0913/GMNet)        | **74.1**         | 57.3          | 153             |
+| [EGFNet](https://github.com/ShaohuaDong2021/EGFNet)       | 72.7             | 54.8          | 62.5            |
+| [CRM-T](https://github.com/UkcheolShin/CRM_RGBTSeg)        | -                | 59.7          | 59.1            |
+| [Sigma-T](https://github.com/zifuwan/Sigma)       | 71.3             | 60.23         | 48.3            |
 | **Ours**                                             | 71.1             | **60.6**      | 29.5            |
 ### 📊 **Performance Comparison on FLAME2**
 | **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
 |--------------------------|-------------------|---------------|-----------------|
-| [PIDNet-RGB](https://example.com)  | 75.66            | 61.21         | 34.4            |
-| [PIDNet-IR](https://example.com)   | 83.05            | 58.71         | 34.4            |
-| [PIDNet-Early](https://example.com) | 88.25            | 73.90         | 34.4            |
-| [MFNet](https://example.com)        | 93.53            | 80.26         | **0.73**         |
-| [RTFNet](https://example.com)      | 73.87            | 65.42         | 185.24          |
-| [GMNet](https://example.com)      | 67.53            | 54.08         | 153             |
-| [EGFNet](https://example.com)     | 74.27            | 60.98         | 62.5            |
-| [CRM-T](https://example.com)      | -                | -             | 59.1            |
-| [Sigma-T](https://example.com)     | 92.6             | 86.27         | 48.3            |
+| [PIDNet-RGB](https://github.com/XuJiacong/PIDNet)  | 75.66            | 61.21         | 34.4            |
+| [PIDNet-IR](https://github.com/XuJiacong/PIDNet)   | 83.05            | 58.71         | 34.4            |
+| [PIDNet-Early](https://github.com/XuJiacong/PIDNet) | 88.25            | 73.90         | 34.4            |
+| [MFNet](https://github.com/haqishen/MFNet-pytorch)        | 93.53            | 80.26         | **0.73**         |
+| [RTFNet](https://github.com/yuxiangsun/RTFNet)      | 73.87            | 65.42         | 185.24          |
+| [GMNet](https://github.com/Jinfu0913/GMNet)      | 67.53            | 54.08         | 153             |
+| [EGFNet](https://github.com/ShaohuaDong2021/EGFNet)     | 74.27            | 60.98         | 62.5            |
+| [CRM-T](https://github.com/UkcheolShin/CRM_RGBTSeg)      | -                | -             | 59.1            |
+| [Sigma-T](https://github.com/zifuwan/Sigma)     | 92.6             | 86.27         | 48.3            |
 | **Ours**                            | **94.34**        | **88.39**     | 29.5            |
 
 ## Usage
