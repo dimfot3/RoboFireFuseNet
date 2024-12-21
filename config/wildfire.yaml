@@ -18,7 +18,7 @@ WINDOW_SIZE: 8
 TF_CONFIG: [2, 6]
 # data
 TRAINSET: 'lists/train_flm.txt'
-VALIDSET: 'lists/test_flm.txt'
+VALIDSET: 'lists/val_flm.txt'
 TESTSET: 'lists/test_flm.txt'
 ROOTDATASET: './data'
 NUM_CLASSES: 3
