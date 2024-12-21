@@ -97,9 +97,9 @@ Customize configurations via the config/ folder or override them with inline arg
   
 ### 3. Testing
 Customize configurations via the config/ folder or override them with inline arguments.
-- test fusion model on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:1" --PRETRAINED "weights/robo_fire_best.pth"`
-- test robust module on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN True --SESSIONAME "train_simple" --DEVICE "cuda:1" --PRETRAINED "weights/robo_fire_robust.pth"`
-- test fusion model on urban dataset: `python test.py --yaml_file urban.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:1" --PRETRAINED "weights/robo_urban.pth"`
+- test fusion model on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_best.pth"`
+- test robust module on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN True --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_robust.pth"`
+- test fusion model on urban dataset: `python test.py --yaml_file urban.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_urban.pth"`
 
 ## Citation
 (TODO: complete the information when paper accepted)
