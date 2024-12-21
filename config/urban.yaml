@@ -3,7 +3,7 @@ PROJECTNAME: 'Urban'
 SESSIONAME: 'test'
 DEVICE: 'cuda:0'
 NUM_WORKERS: 10
-ONLINELOG: True
+ONLINELOG: False
 SEED: 200
 STOPCOUNTER: 400
 VALID_FREQ: 2
@@ -17,10 +17,10 @@ CHECKPOINT: null
 WINDOW_SIZE: 8
 TF_CONFIG: [2, 6]
 # data
-TRAINSET: 'lists/train_mfnet.txt'
+TRAINSET: 'lists/trainval_mfnet.txt'
 VALIDSET: 'lists/val_mfnet.txt'
 TESTSET: 'lists/test_mfnet.txt'
-ROOTDATASET: '../Datasets/'
+ROOTDATASET: './data/'
 NUM_CLASSES: 9
 CLS_NAMES: ['unlabeled', 'car', 'person', 'bike', 'curve', 'car stop', 'guardrail', 'color cone', 'bump']
 MODE: 'fusion'
