@@ -86,8 +86,8 @@ The optional, lightweight robustness module enhances modality alignment by itera
 
 ### 0. Setup
 - Install python requirements: `pip install -r requirements.txt`
-- Download the [weights](LINK) inside the weights folder.
-- Download the [Data](LINK) inside the data folder.
+- Download the [weights](https://drive.google.com/drive/folders/1wldeSDx5VVjynABJqm55RDREAnPonk5y?usp=sharing) inside the weights folder.
+- Download the [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder.
   
 ### 2. Training
 Customize configurations via the config/ folder or override them with inline arguments.
