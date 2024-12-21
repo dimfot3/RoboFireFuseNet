@@ -17,10 +17,10 @@ CHECKPOINT: null
 WINDOW_SIZE: 8
 TF_CONFIG: [2, 6]
 # data
-TRAINSET: 'lists/test_fin.txt'
-VALIDSET: 'lists/test_fin.txt'
-TESTSET: 'lists/test_fin.txt'
-ROOTDATASET: '../Datasets/'
+TRAINSET: 'lists/train_flm.txt'
+VALIDSET: 'lists/test_flm.txt'
+TESTSET: 'lists/test_flm.txt'
+ROOTDATASET: './data'
 NUM_CLASSES: 3
 CLS_NAMES: ['background', 'smoke', 'fire']
 MODE: 'fusion'
