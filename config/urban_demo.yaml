@@ -1,0 +1,54 @@
+# general
+PROJECTNAME: 'Urban'
+SESSIONAME: 'test'
+DEVICE: 'cuda:0'
+NUM_WORKERS: 10
+ONLINELOG: False
+SEED: 200
+STOPCOUNTER: 400
+VALID_FREQ: 2
+WARMUP: 20
+ROBUST_TRAIN: False
+# model
+MODEL: 'robofire'
+NUM_OUTPUTS: 2
+PRETRAINED: "weights/robo_urban.pth"
+CHECKPOINT: null
+WINDOW_SIZE: 8
+TF_CONFIG: [2, 6]
+# data
+TRAINSET: 'demo_urban.txt'
+VALIDSET: 'demo_urban.txt'
+TESTSET: 'demo_urban.txt'
+ROOTDATASET: './outputs/demo'
+NUM_CLASSES: 9
+CLS_NAMES: ['unlabeled', 'car', 'person', 'bike', 'curve', 'car stop', 'guardrail', 'color cone', 'bump']
+MODE: 'fusion'
+MULTISCALE: True
+FLIP: True
+BRIGHTNESS: True
+SINGLE_SOURCE: False
+COMP_MASK: True
+BLEND_IMGS: True
+IGNORE_LABEL: 255
+SCALE_FACTOR: 10
+CROP_SIZE: [480, 640]
+BASE_SIZE: 640
+CLASS_WEIGHTS: [1.42312027, 7.5367994, 9.39792775, 9.69024351, 9.90912422, 10.01344351, 10.37182548, 10.27949471, 10.16517178]
+ALIGN_CORNERS: True
+# loss and optimization
+LR: 0.001
+BATCHSIZE: 5
+EPOCHS: 500
+OPTIM: 'ADAM'
+SCHED: 'COS'
+USE_OHEM: False
+OHEMTHRES: 0.9
+OHEMKEEP: 131072
+WD: 0.00001
+MOMENTUM: 0.9
+NESTEROV: False
+BALANCE_WEIGHTS: [0.4, 1.0]
+T_THRESH_BDLOSS: 0.8
+BD_WEIGHT: 1.0
+SB_WEIGHTS: 1.0
