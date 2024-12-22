@@ -100,6 +100,7 @@ Customize configurations via the config/ folder or override them with inline arg
 - test fusion model on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_best.pth"`
 - test robust module on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN True --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_robust.pth"`
 - test fusion model on urban dataset: `python test.py --yaml_file urban.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_urban.pth"`
+- To run the demo with custom images, place your files in the outputs/demo folder using the following naming conventions:     `<prefix>_rgb_<postfix>.png` for RGB images, `<prefix>_ir_<postfix>.png` for IR images, and a `.txt` file with rows formatted as `<prefix>_XXX_<postfix>.png`. Replace `<prefix>` and `<postfix>` with any values, ensuring `rgb` and `ir` indicate the modality. Optionally, include ground truth files named `<prefix>_gt_<postfix>.png` to calculate metrics. Run the demo using `python test.py --yaml_file wildfire_demo.yaml` for the wildfire demo or `python test.py --yaml_file urban_demo.yaml for the urban demo` for urban one. If you use custom `.txt` file instead of `demo_fire.txt` and `demo_urban.txt` adjust the YAML config files.
 
 ## Citation
 (TODO: complete the information when paper accepted)
