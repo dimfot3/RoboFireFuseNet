@@ -305,3 +305,35 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))
     plt.close(f)
+
+def qualitive_test(inf_model, val_data, ex_path='./outputs'):
+    """
+    Perform qualitative evaluation of the segmentation model and save the results.
+
+    Parameters:
+    inf_model (torch.nn.Module): The model used for inference.
+    val_data (Dataset): The validation dataset containing images and labels.
+    ex_path (str, optional): The directory path where output images will be saved. Defaults to './outputs'.
+    name (str, optional): The filename for the saved output image. Defaults to 'example.png'.
+
+    Returns:
+    None
+    """
+    valid_loader = iter(DataLoader(val_data, batch_size=1, shuffle=True))
+    os.makedirs(ex_path, exist_ok=True)
+    for sampleid in range(len(valid_loader)):
+        batch = next(valid_loader)
+        images, name = batch[0], batch[3]
+        label = batch[1][0].detach().cpu().numpy().astype('uint8')
+        outputs = inf_model(images)
+        images = (np.transpose(images[0, :3, :, :].detach().cpu().numpy(), (1, 2, 0)) * val_data.std_rgb) + val_data.mean_rgb
+        images = (images * 255).astype('uint8')
+        outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
+        non_bg_idxs = outputs!=0
+        fire_instances = outputs == 2
+        outputs = val_data.label2color(outputs)
+        if val_data.num_classes == 3:
+            outputs[fire_instances, 1:] = 0
+        images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
+        plt.imsave(os.path.join(ex_path, name[0][0]), images)
+        plt.close()

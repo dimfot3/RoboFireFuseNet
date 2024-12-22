@@ -19,6 +19,7 @@ def test(trainer, test_dataset, args, logger):
         running_loss += loss.item() / len(test_loader)
     metrics, iou = calculate_metrics(conf_mat, running_loss, cls_names=args['CLS_NAMES'], cls_weights=args['CLASS_WEIGHTS'], val=True)
     logger.print_metrics(metrics, cls_names=args['CLS_NAMES'], num_classes=args['NUM_CLASSES'], cls_weights=args['CLS_NAMES'], val=True)
+    qualitive_test(lambda data: trainer.inference(data), test_dataset, ex_path='./outputs/demo')
     print('-'*shutil.get_terminal_size()[0])
     return metrics
 
