@@ -300,7 +300,7 @@ def qualitive_eval(inf_model, val_data, ex_path='./outputs', name='example.png')
         outputs = outputs.detach().cpu().numpy().astype('uint8')[0]
         non_bg_idxs = outputs!=0
         outputs = val_data.label2color(outputs)
-        # images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
+        images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
         ax[sampleid // 5][sampleid % 5].imshow(images, aspect='auto')
     os.makedirs(ex_path, exist_ok=True)
     plt.savefig(os.path.join(ex_path, name))

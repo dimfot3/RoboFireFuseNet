@@ -62,7 +62,7 @@ class ChannelAttentionModule(nn.Module):
         return x
 
 def drop_path(x, drop_prob=0.2, training=True):
-    if drop_prob == 0. or not training:
+    if drop_prob == 0 or not training:
         return x
     batch_size = x.shape[0]
     keep_prob = 1 - drop_prob
@@ -81,12 +81,10 @@ class RoboFireFuseNet(nn.Module):
         self.planes = planes
         input_resolution = np.array(input_resolution)
         self.robust_module =  None
-        self.drop_paths_modalities = [0.2, 0.2, 0]     # rgb, ir, fusion
-        self.drop_paths_shortcuts = [0.15, 0.15, 0.15, 0.15]    # 0, 1, 2
+        self.drop_paths_modalities = [0.2, 0.2, 0]  if  num_classes==3 else [0, 0, 0]   # rgb, ir, fusion
+        self.drop_paths_shortcuts = [0.15, 0.15, 0.15, 0.15] if  num_classes==3 else [0, 0, 0, 0]    # 0, 1, 2
         if robust_module:
             self.robust_module = RobustModule(planes*2, h=input_resolution[0]//8, w=input_resolution[1]//8)
-            self.layer1_rgb_rob = self._make_layer(BasicBlock, planes, planes, m)
-            self.layer2_rgb_rob = self._make_layer(BasicBlock, planes, planes * 2, m, stride=2)
 
         # I Branch
         self.conv1_rgb_0 =  nn.Sequential(
@@ -103,8 +101,7 @@ class RoboFireFuseNet(nn.Module):
                           nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
                           BatchNorm2d(planes, momentum=bn_mom),
                           nn.ReLU(inplace=True),
-                      )
-        
+                      ) 
 
         self.conv1_ir_0 =  nn.Sequential(
                           nn.Conv2d(1,planes, kernel_size=3, stride=1, padding=1),
