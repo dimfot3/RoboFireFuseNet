@@ -333,7 +333,7 @@ def qualitive_test(inf_model, val_data, ex_path='./outputs'):
         fire_instances = outputs == 2
         outputs = val_data.label2color(outputs)
         if val_data.num_classes == 3:
-            outputs[fire_instances, 1:] = 0
+            outputs[fire_instances, 1:] = 0         # this is for making fire red
         images[non_bg_idxs] = 0.199 * images[non_bg_idxs] + 0.799 * outputs[non_bg_idxs]
         plt.imsave(os.path.join(ex_path, name[0][0]), images)
         plt.close()
