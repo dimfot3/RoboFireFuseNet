@@ -307,6 +307,6 @@ class TotalLoss:
         filler = torch.ones_like(labels) * self.ignore_label
         bd_label = torch.where(F.sigmoid(outputs[-1][:,0,:,:])>self.t_thresh_bd, labels, filler)
         loss_sb = self.sem_criterion(outputs[-2], bd_label)
-        loss += (loss_s if not torch.isnan(loss_sb) else 0)  + (loss_b if not torch.isnan(loss_sb) else 0) + (loss_sb if not torch.isnan(loss_sb) else 0)
+        loss += (loss_s if not torch.isnan(loss_sb) else 0)  + (loss_b if not torch.isnan(loss_b) else 0) + (loss_sb if not torch.isnan(loss_sb) else 0)
         return torch.unsqueeze(loss,0), outputs[:-1], acc, [loss_s, loss_b]
 
