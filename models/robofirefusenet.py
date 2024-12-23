@@ -81,7 +81,7 @@ class RoboFireFuseNet(nn.Module):
         self.planes = planes
         input_resolution = np.array(input_resolution)
         self.robust_module =  None
-        self.norm = 'batch' if num_classes > 3 else 'group'
+        self.norm = 'group'
         self.drop_paths_modalities = [0.2, 0.2, 0]  if  num_classes==3 else [0, 0, 0]   # rgb, ir, fusion
         self.drop_paths_shortcuts = [0.15, 0.15, 0.15, 0.15] if  num_classes==3 else [0, 0, 0, 0]    # 0, 1, 2
         if robust_module:
