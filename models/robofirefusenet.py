@@ -81,6 +81,7 @@ class RoboFireFuseNet(nn.Module):
         self.planes = planes
         input_resolution = np.array(input_resolution)
         self.robust_module =  None
+        self.norm = 'batch' if num_classes > 3 else 'group'
         self.drop_paths_modalities = [0.2, 0.2, 0]  if  num_classes==3 else [0, 0, 0]   # rgb, ir, fusion
         self.drop_paths_shortcuts = [0.15, 0.15, 0.15, 0.15] if  num_classes==3 else [0, 0, 0, 0]    # 0, 1, 2
         if robust_module:
@@ -89,12 +90,12 @@ class RoboFireFuseNet(nn.Module):
         # I Branch
         self.conv1_rgb_0 =  nn.Sequential(
                           nn.Conv2d(3,planes, kernel_size=3, stride=1, padding=1),
-                          nn.GroupNorm(8, planes),
+                          nn.GroupNorm(8, planes) if self.norm=='group' else BatchNorm2d(planes),
                           nn.ReLU(inplace=True),
                       )
         self.conv1_rgb_1 =  nn.Sequential(
                           nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
-                          nn.GroupNorm(8, planes),
+                          nn.GroupNorm(8, planes) if self.norm=='group' else BatchNorm2d(planes),
                           nn.ReLU(inplace=True),
                       )
         self.conv1_rgb_2 =  nn.Sequential(
@@ -105,12 +106,12 @@ class RoboFireFuseNet(nn.Module):
 
         self.conv1_ir_0 =  nn.Sequential(
                           nn.Conv2d(1,planes, kernel_size=3, stride=1, padding=1),
-                          nn.GroupNorm(8, planes),
+                          nn.GroupNorm(8, planes) if self.norm=='group' else BatchNorm2d(planes),
                           nn.ReLU(inplace=True),
                       )
         self.conv1_ir_1 =  nn.Sequential(
                           nn.Conv2d(planes,planes,kernel_size=3, stride=2, padding=1),
-                          nn.GroupNorm(8, planes),
+                          nn.GroupNorm(8, planes) if self.norm=='group' else BatchNorm2d(planes),
                           nn.ReLU(inplace=True),
                       )
         self.conv1_ir_2 =  nn.Sequential(
@@ -120,22 +121,22 @@ class RoboFireFuseNet(nn.Module):
                       )
         self.tf_conv0 = nn.Sequential(
                           nn.Conv2d(2*planes,4*planes,kernel_size=1),
-                          nn.GroupNorm(16, 4*planes),
+                          nn.GroupNorm(16, 4*planes) if self.norm=='group' else BatchNorm2d(4*planes),
                           nn.ReLU(inplace=True),
                       )
         self.tf_conv1 = nn.Sequential(
                           nn.Conv2d(2*planes,4*planes,kernel_size=1),
-                          nn.GroupNorm(16, 4*planes),
+                          nn.GroupNorm(16, 4*planes) if self.norm=='group' else BatchNorm2d(4*planes),
                           nn.ReLU(inplace=True),
                       )
         self.tf_conv2 = nn.Sequential(
                           nn.Conv2d(2*planes,4*planes,kernel_size=1),
-                          nn.GroupNorm(16, 4*planes),
+                          nn.GroupNorm(16, 4*planes) if self.norm=='group' else BatchNorm2d(4*planes),
                           nn.ReLU(inplace=True),
                       )
         self.tf_conv3 = nn.Sequential(
                           nn.Conv2d(4*planes,4*planes,kernel_size=1),
-                          nn.GroupNorm(16, 4*planes),
+                          nn.GroupNorm(16, 4*planes) if self.norm=='group' else BatchNorm2d(4*planes),
                           nn.ReLU(inplace=True),
                       )
         self.relu = nn.ReLU(inplace=True)
@@ -254,7 +255,6 @@ class RoboFireFuseNet(nn.Module):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
- 
     def _make_layer(self, block, inplanes, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or inplanes != planes * block.expansion:
@@ -289,7 +289,6 @@ class RoboFireFuseNet(nn.Module):
         return layer
     
     def imgnet_pretrain(self, path):
-        
         pretrained_state = torch.load(path, map_location='cpu')
         if 'state_dict' in pretrained_state.keys():
             pretrained_state = pretrained_state['state_dict']
