@@ -3,27 +3,28 @@
 This is the official repository for our recent work: RoboFireFuseNet: Robust Fusion of Visible and Infrared Imaging for Real-Time Flame and Smoke Segmentation in Wildfire Scenarios
 
 ### Abstract
-Concurrent segmentation of flames and smoke is a
-challenging task, particularly when relying on a single spectral
-band. Leveraging the combination of visible (RGB) and infrared
-(thermal) modalities in wildfire imaging significantly enhances the
-accuracy and robustness of fire segmentation systems. However,
-fusing these modalities presents notable challenges due to the
-high diversity in data representation, with certain features being
-exclusive to specific spectra. This paper evaluates the effectiveness
-of RGB and thermal data for flame and smoke segmentation,
-exploring various fusion strategies. A novel intermediate fusion
-architecture is proposed, built upon a real-time, state-of-the-
-art segmentation model augmented with attention mechanisms
-and specifically designed to address the complexities of modality
-fusion. Practical challenges, such as robustness to unregistered
-inputs and sensor failures are also addressed, resulting in one
-of the first models to effectively tackle the issue of unregistered
-fusion. The lightweight model achieves comparable accuracy to
-state-of-the-art architectures on urban datasets and surpasses
-them in wildfire scenarios, offering real-time capabilities and
-enhanced robustness suitable for robotic applications in dynamic
-and high-stakes environments.
+Concurrent flame and smoke image region segmentation is a challenging task, particularly when relying on a single
+imaging modality. Leveraging the combination of visible (RGB)
+and infrared (IR) modalities in wildfire imaging significantly
+enhances the accuracy and robustness of fire segmentation. Especially in dense wildfire smoke incidents, certain image features are
+exclusively imaged in one modality only; hence, the two wildfire
+imaging modalities are inherently complementary. This paper
+evaluates the effectiveness of RGB and IR image fusion for flame
+and smoke image region segmentation. A novel intermediate
+image fusion architecture is proposed, built upon a real-time,
+state-of-the-art DNN semantic segmentation model, augmented
+with attention mechanisms that promote efficient image modality
+fusion. Furthermore, a U-Net-like decoder enables accurate
+spatial reconstruction of the lower-dimension-encoded features.
+Practical challenges, such as image segmentation robustness to
+lack of image registration and sensor failures, are also efficiently
+addressed. The lightweight DNN segmentation model achieves
+comparable accuracy to state-of-the-art semantic image region
+segmentation architectures on urban datasets and surpasses them
+in wildfire scenarios. Its real-time capabilities and enhanced
+robustness are suitable for robotic applications in addressing
+dynamic high-stakes wildfire disasters. Code is available at
+https://github.com/dimfot3/RoboFireFuseNet.
 
 <div align="center">
    <h4>MIOU vs FPS on MFNet dataset and RTX 4090</h4>
