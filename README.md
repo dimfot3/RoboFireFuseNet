@@ -28,7 +28,7 @@ Concurrent flame and smoke image region segmentation is a challenging task, part
 Schematic overview of the proposed fusion model and the robust module.
 
 ### Fusion Architecture
-Our model builds on PIDNet-Small by integrating SwinV2-T Transformer blocks to enhance capacity and capture long-range dependencies. We introduce dual modality paths to preserve and mine modality-specific features, and replace simple upscaling with a U-Net style decoder using shortcut connections. This design restores spatial dimensions while retaining essential small-scale features for improved segmentation.
+Our model enhances PIDNet-Small by integrating SwinV2-T Transformer blocks, improving capacity and capturing long-range dependencies. To better preserve and extract modality-specific features, we introduce dedicated modality pathways. Additionally, we replace basic upscaling with a U-Net-style decoder, enhancing spatial reconstruction and producing high-resolution segmentation maps.
 
 <img src="figs/mymodel.png" alt="Model Architecture" width="700"/>
 
