@@ -74,7 +74,7 @@ The optional, lightweight robustness module enhances modality alignment by itera
 ### 0. Setup
 - Install python requirements: `pip install -r requirements.txt` or recommender `Python 3.10.12`
 - Download the [weights](https://drive.google.com/drive/folders/1wldeSDx5VVjynABJqm55RDREAnPonk5y?usp=sharing) inside the weights folder.
-- Download the [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder.
+- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on public FLAME2 dataset.
   
 ### 2. Training
 Customize configurations via the config/ folder or override them with inline arguments.
