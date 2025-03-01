@@ -1,30 +1,9 @@
 # RoboFireFuseNet
 
-This is the official repository for our recent work: RoboFireFuseNet: Robust Fusion of Visible and Infrared Imaging for Real-Time Flame and Smoke Segmentation in Wildfire Scenarios
+This is the official repository for our recent work: RoboFireFuseNet: Robust Fusion of Visible and Infrared WildfireImaging for Real-Time Flame and Smoke Segmentation
 
 ### Abstract
-Concurrent flame and smoke image region segmentation is a challenging task, particularly when relying on a single
-imaging modality. Leveraging the combination of visible (RGB)
-and infrared (IR) modalities in wildfire imaging significantly
-enhances the accuracy and robustness of fire segmentation. Especially in dense wildfire smoke incidents, certain image features are
-exclusively imaged in one modality only; hence, the two wildfire
-imaging modalities are inherently complementary. This paper
-evaluates the effectiveness of RGB and IR image fusion for flame
-and smoke image region segmentation. A novel intermediate
-image fusion architecture is proposed, built upon a real-time,
-state-of-the-art DNN semantic segmentation model, augmented
-with attention mechanisms that promote efficient image modality
-fusion. Furthermore, a U-Net-like decoder enables accurate
-spatial reconstruction of the lower-dimension-encoded features.
-Practical challenges, such as image segmentation robustness to
-lack of image registration and sensor failures, are also efficiently
-addressed. The lightweight DNN segmentation model achieves
-comparable accuracy to state-of-the-art semantic image region
-segmentation architectures on urban datasets and surpasses them
-in wildfire scenarios. Its real-time capabilities and enhanced
-robustness are suitable for robotic applications in addressing
-dynamic high-stakes wildfire disasters. Code is available at
-https://github.com/dimfot3/RoboFireFuseNet.
+Concurrent flame and smoke image region segmentation is a challenging task, particularly when relying on a single imaging modality. Leveraging the combination of visible (RGB) and infrared (IR) modalities in wildfire imaging significantly enhances the accuracy and robustness of fire segmentation. In particular, during dense wildfire smoke incidents, certain image features are only imaged by one modality. Therefore, the two wildfire imaging modalities are inherently complementary. This paper evaluates the effectiveness of RGB and IR image fusion for flame and smoke region segmentation. A novel intermediate image fusion architecture is proposed, built upon a real-time, state-of-the-art DNN semantic segmentation model, augmented with attention mechanisms that promote efficient image modality fusion. Furthermore, a U-Net-like decoder enables accurate spatial reconstruction of the lower-dimensional encoded features. Practical challenges, such as segmentation robustness in the absence of image registration and sensor failures, are also efficiently addressed. Based on our experiments, the proposed DNN segmentation model greatly outperforms existing multimodal DNN architectures in wildfire scenarios in terms of accuracy, while also comparing favorably to state-of-the-art semantic image region segmentation architectures in general urban datasets. Its real-time capabilities and enhanced robustness render it suitable for robotic applications in dynamic, high-stakes segmentation tasks.
 
 <div align="center">
    <h4>MIOU vs FPS on MFNet dataset and RTX 4090</h4>
@@ -33,9 +12,11 @@ https://github.com/dimfot3/RoboFireFuseNet.
 
 ## Highlights
 
-- 🔥 <b>Lightweight & Powerful Multimodal Segmentation</b>: Our real-time fusion model outperforms many SOTA models with fewer parameters in segmentation task with visible and thermal imaging.
-- 🚁 <b>Smoke & Flame Segmentation</b>: Excels in dense smoke conditions, accurately segmenting concurently flames and smoke.
-- 🛠️ <b>Robust Fusion</b>: Handles modality misalignment and sensor failures achieving semantic segmentation fusing unregistered inputs.
+- 🔄 **Multimodal Fusion**: Combines CNN and attention blocks to extract cross-modal, spatiotemporal features.  
+- ⚡ **Real-Time Performance**: Designed for lightweight, real-world wildfire detection with high efficiency.  
+- 🔥 **Flame & Smoke Segmentation**: Handles dense smoke coverage while detecting small flame spots.  
+- 🎯 **Compact & Efficient**: Achieves competitive segmentation accuracy with fewer parameters than state-of-the-art models.  
+- 🛰️ **Robust to Misalignment**: Introduces an optional geospatial transformer to handle RGB-IR misalignment and sensor failures.  
    
 ## Updates
 - Paper is submitted to ...
@@ -56,6 +37,20 @@ The optional, lightweight robustness module enhances modality alignment by itera
 
 <img src="figs/robust.png" alt="Model Architecture" width="400"/>
 
+### 📊 **Performance Comparison on FLAME2**
+| **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
+|--------------------------|-------------------|---------------|-----------------|
+| [PIDNet-RGB](https://github.com/XuJiacong/PIDNet)  | 75.66            | 61.21         | 34.4            |
+| [PIDNet-IR](https://github.com/XuJiacong/PIDNet)   | 83.05            | 58.71         | 34.4            |
+| [PIDNet-Early](https://github.com/XuJiacong/PIDNet) | 88.25            | 73.90         | 34.4            |
+| [MFNet](https://github.com/haqishen/MFNet-pytorch)        | 93.53            | 80.26         | **0.73**         |
+| [RTFNet](https://github.com/yuxiangsun/RTFNet)      | 73.87            | 65.42         | 185.24          |
+| [GMNet](https://github.com/Jinfu0913/GMNet)      | 67.53            | 54.08         | 153             |
+| [EGFNet](https://github.com/ShaohuaDong2021/EGFNet)     | 74.27            | 60.98         | 62.5            |
+| [CRM-T](https://github.com/UkcheolShin/CRM_RGBTSeg)      | -                | -             | 59.1            |
+| [Sigma-T](https://github.com/zifuwan/Sigma)     | 92.6             | 86.27         | 48.3            |
+| **Ours**                            | **94.37**        | **88.17**     | 29.5            |
+
 ### 📊 **Performance Comparison on Urban Scenes (MFNet)**
 | **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
 |--------------------------|-------------------|---------------|-----------------|
@@ -69,19 +64,6 @@ The optional, lightweight robustness module enhances modality alignment by itera
 | [CRM-T](https://github.com/UkcheolShin/CRM_RGBTSeg)        | -                | 59.7          | 59.1            |
 | [Sigma-T](https://github.com/zifuwan/Sigma)       | 71.3             | 60.23         | 48.3            |
 | **Ours**                                             | 71.1             | **60.6**      | 29.5            |
-### 📊 **Performance Comparison on FLAME2**
-| **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
-|--------------------------|-------------------|---------------|-----------------|
-| [PIDNet-RGB](https://github.com/XuJiacong/PIDNet)  | 75.66            | 61.21         | 34.4            |
-| [PIDNet-IR](https://github.com/XuJiacong/PIDNet)   | 83.05            | 58.71         | 34.4            |
-| [PIDNet-Early](https://github.com/XuJiacong/PIDNet) | 88.25            | 73.90         | 34.4            |
-| [MFNet](https://github.com/haqishen/MFNet-pytorch)        | 93.53            | 80.26         | **0.73**         |
-| [RTFNet](https://github.com/yuxiangsun/RTFNet)      | 73.87            | 65.42         | 185.24          |
-| [GMNet](https://github.com/Jinfu0913/GMNet)      | 67.53            | 54.08         | 153             |
-| [EGFNet](https://github.com/ShaohuaDong2021/EGFNet)     | 74.27            | 60.98         | 62.5            |
-| [CRM-T](https://github.com/UkcheolShin/CRM_RGBTSeg)      | -                | -             | 59.1            |
-| [Sigma-T](https://github.com/zifuwan/Sigma)     | 92.6             | 86.27         | 48.3            |
-| **Ours**                            | **94.34**        | **88.39**     | 29.5            |
 
 ## Usage
 
