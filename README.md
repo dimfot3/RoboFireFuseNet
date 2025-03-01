@@ -51,6 +51,8 @@ The optional, lightweight robustness module enhances modality alignment by itera
 | [Sigma-T](https://github.com/zifuwan/Sigma)     | 92.6             | 86.27         | 48.3            |
 | **Ours**                            | **94.37**        | **88.17**     | 29.5            |
 
+<img src="figs/wildfire_qual_res.png" alt="Model Architecture" width="1200"/>
+
 ### 📊 **Performance Comparison on Urban Scenes (MFNet)**
 | **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
 |--------------------------|-------------------|---------------|-----------------|
@@ -64,6 +66,8 @@ The optional, lightweight robustness module enhances modality alignment by itera
 | [CRM-T](https://github.com/UkcheolShin/CRM_RGBTSeg)        | -                | 59.7          | 59.1            |
 | [Sigma-T](https://github.com/zifuwan/Sigma)       | 71.3             | 60.23         | 48.3            |
 | **Ours**                                             | 71.1             | **60.6**      | 29.5            |
+
+<img src="figs/mfnet_qual.png" alt="Model Architecture" width="1200"/>
 
 ## Usage
 
