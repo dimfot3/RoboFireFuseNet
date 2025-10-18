@@ -3,7 +3,7 @@
 This is the official repository for our recent work: RoboFireFuseNet: Robust Fusion of Visible and Infrared WildfireImaging for Real-Time Flame and Smoke Segmentation
 
 ### Abstract
-Concurrent flame and smoke image region segmentation is a challenging task, particularly when relying on a single imaging modality. Leveraging the combination of visible (RGB) and infrared (IR) modalities in wildfire imaging significantly enhances the accuracy and robustness of fire segmentation. In particular, during dense wildfire smoke incidents, certain image features are only imaged by one modality. Therefore, the two wildfire imaging modalities are inherently complementary. This paper evaluates the effectiveness of RGB and IR image fusion for flame and smoke region segmentation. A novel intermediate image fusion architecture is proposed, built upon a real-time, state-of-the-art DNN semantic segmentation model, augmented with attention mechanisms that promote efficient image modality fusion. Furthermore, a U-Net-like decoder enables accurate spatial reconstruction of the lower-dimensional encoded features. Practical challenges, such as segmentation robustness in the absence of image registration and sensor failures, are also efficiently addressed. Based on our experiments, the proposed DNN segmentation model greatly outperforms existing multimodal DNN architectures in wildfire scenarios in terms of accuracy, while also comparing favorably to state-of-the-art semantic image region segmentation architectures in general urban datasets. Its real-time capabilities and enhanced robustness render it suitable for robotic applications in dynamic, high-stakes segmentation tasks.
+Concurrent segmentation of flames and smoke is challenging, as smoke frequently obscures fire in RGB imagery. Existing multimodal models are either too computationally demanding for real-time deployment or too lightweight to capture fine fire details that may escalate into large wildfires. Moreover, they are typically trained and validated on simplistic datasets, such as Corsican and FLAME1, which lack the dense smoke occlusion present in real-world scenarios. We introduce RoboFireFuseNet (RFFNet), a real-time deep neural network that fuses RGB and infrared (IR) data through attention-based mechanisms and a detail-preserving decoder. Beyond strong performance, RFFNet establishes a benchmark on a challenging, real-world wildfire dataset with dense smoke, creating a foundation for fair comparison in future flame-and-smoke segmentation research. Despite its lightweight design, it achieves state-of-the-art results on a general urban benchmark, demonstrating both efficiency and versatility. Its combination of accuracy, real-time performance, and multimodal fusion makes RFFNet well-suited for proactive, robust and accurate wildfire monitoring.
 
 <div align="center">
    <h4>MIOU vs FPS on MFNet dataset and RTX 4090</h4>
@@ -16,7 +16,6 @@ Concurrent flame and smoke image region segmentation is a challenging task, part
 - ⚡ **Real-Time Performance**: Designed for lightweight, real-world wildfire detection with high efficiency.  
 - 🔥 **Flame & Smoke Segmentation**: Handles dense smoke coverage while detecting small flame spots.  
 - 🎯 **Compact & Efficient**: Achieves competitive segmentation accuracy with fewer parameters than state-of-the-art models.  
-- 🛰️ **Robust to Misalignment**: Introduces an optional geospatial transformer to handle RGB-IR misalignment and sensor failures.  
    
 ## Updates
 - Paper is submitted to ...
@@ -25,17 +24,12 @@ Concurrent flame and smoke image region segmentation is a challenging task, part
 
 
 ## Overview
-Schematic overview of the proposed fusion model and the robust module.
+Schematic overview of the proposed fusion model and
 
 ### Fusion Architecture
 Our model enhances PIDNet-Small by integrating SwinV2-T Transformer blocks, improving capacity and capturing long-range dependencies. To better preserve and extract modality-specific features, we introduce dedicated modality pathways. Additionally, we replace basic upscaling with a U-Net-style decoder, enhancing spatial reconstruction and producing high-resolution segmentation maps.
 
 <img src="figs/mymodel.png" alt="Model Architecture" width="700"/>
-
-### Robust module
-The optional, lightweight robustness module enhances modality alignment by iteratively estimating the optimal affine transformation to align Infrared and RGB modalities. It leverages cross-attention between the two modalities to generate a misalignment-aware map, ensuring more accurate feature fusion and improved robustness.
-
-<img src="figs/robust.png" alt="Model Architecture" width="400"/>
 
 ### 📊 **Performance Comparison on FLAME2**
 | **Method**                | **Avg Recall (%)** | **MIoU (%)** | **Params (M)** |
@@ -44,6 +38,7 @@ The optional, lightweight robustness module enhances modality alignment by itera
 | [PIDNet-IR](https://github.com/XuJiacong/PIDNet)   | 83.05            | 58.71         | 34.4            |
 | [PIDNet-Early](https://github.com/XuJiacong/PIDNet) | 88.25            | 73.90         | 34.4            |
 | [MFNet](https://github.com/haqishen/MFNet-pytorch)        | 93.53            | 80.26         | **0.73**         |
+|[EFSIT*](https://github.com/hayatkhan8660-maker/Fire_Seg_Dataset)  | 90.15 | 80.09 |  4.8 |
 | [RTFNet](https://github.com/yuxiangsun/RTFNet)      | 73.87            | 65.42         | 185.24          |
 | [GMNet](https://github.com/Jinfu0913/GMNet)      | 67.53            | 54.08         | 153             |
 | [EGFNet](https://github.com/ShaohuaDong2021/EGFNet)     | 74.27            | 60.98         | 62.5            |
@@ -78,15 +73,13 @@ The optional, lightweight robustness module enhances modality alignment by itera
   
 ### 2. Training
 Customize configurations via the config/ folder or override them with inline arguments.
-- train fusion model on wildfire: `python train.py --yaml_file wildfire.yaml --LR 0.001 --BATCHSIZE 5 --WD 0.00005 --SESSIONAME "train_simple" --EPOCHS 500 --DEVICE "cuda:0" --STOPCOUNTER 30 --ONLINELOG False --ROBUST_TRAIN False --PRETRAINED "weights/pretrained_480x640_w8_2_6.pth" --OPTIM "ADAM" --SCHED "COS"`
-- train robust module on wildfire: `python train.py --yaml_file wildfire.yaml --LR 0.001 --BATCHSIZE 5 --WD 0.00005 --SESSIONAME "train_robust" --EPOCHS 500 --DEVICE "cuda:0" --STOPCOUNTER 30 --ONLINELOG False --ROBUST_TRAIN True --PRETRAINED "weights/robo_fire_aug.pth" --OPTIM "ADAM" --SCHED "COS"`
-- train fusion model on urban dataset: `python train.py --yaml_file urban.yaml --LR 0.001 --BATCHSIZE 5 --WD 0.00001 --SESSIONAME "train_simple" --EPOCHS 500 --DEVICE "cuda:0" --STOPCOUNTER 30 --ONLINELOG False --ROBUST_TRAIN False --PRETRAINED "weights/pretrained_480x640_w8_2_6.pth" --OPTIM "ADAM" --SCHED "COS"`
+- train fusion model on wildfire: `python train.py --yaml_file wildfire.yaml --LR 0.001 --BATCHSIZE 5 --WD 0.00005 --SESSIONAME "train_simple" --EPOCHS 500 --DEVICE "cuda:0" --STOPCOUNTER 30 --ONLINELOG False --PRETRAINED "weights/pretrained_480x640_w8_2_6.pth" --OPTIM "ADAM" --SCHED "COS"`
+- train fusion model on urban dataset: `python train.py --yaml_file urban.yaml --LR 0.001 --BATCHSIZE 5 --WD 0.00001 --SESSIONAME "train_simple" --EPOCHS 500 --DEVICE "cuda:0" --STOPCOUNTER 30 --ONLINELOG False --PRETRAINED "weights/pretrained_480x640_w8_2_6.pth" --OPTIM "ADAM" --SCHED "COS"`
   
 ### 3. Testing
 Customize configurations via the config/ folder or override them with inline arguments.
-- test fusion model on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_best.pth"`
-- test robust module on wildfire: `python test.py --yaml_file wildfire.yaml --ROBUST_TRAIN True --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_robust.pth"`
-- test fusion model on urban dataset: `python test.py --yaml_file urban.yaml --ROBUST_TRAIN False --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_urban.pth"`
+- test fusion model on wildfire: `python test.py --yaml_file wildfire.yaml --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_fire_best.pth"`
+- test fusion model on urban dataset: `python test.py --yaml_file urban.yaml --SESSIONAME "train_simple" --DEVICE "cuda:0" --PRETRAINED "weights/robo_urban.pth"`
 - To run the demo with custom images, place your files in the outputs/demo folder using the following naming conventions:     `<prefix>_rgb_<postfix>.png` for RGB images, `<prefix>_ir_<postfix>.png` for IR images, and a `.txt` file with rows formatted as `<prefix>_XXX_<postfix>.png`. Replace `<prefix>` and `<postfix>` with any values, ensuring `rgb` and `ir` indicate the modality. Optionally, include ground truth files named `<prefix>_gt_<postfix>.png` to calculate metrics. Run the demo using `python test.py --yaml_file wildfire_demo.yaml` for the wildfire demo or `python test.py --yaml_file urban_demo.yaml for the urban demo` for urban one. If you use custom `.txt` file instead of `demo_fire.txt` and `demo_urban.txt` adjust the YAML config files.
 
 ## Citation

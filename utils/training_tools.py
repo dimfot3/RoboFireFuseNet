@@ -28,33 +28,25 @@ class Trainer:
         self.num_classes = args['NUM_CLASSES']
         self.ingore_label = args['IGNORE_LABEL']
         self.stop_counter = args['STOPCOUNTER']
-        self.robust_train = args['ROBUST_TRAIN']
         self.start_epoch = 0
         self.best_metric = 0
         self.stop_cur_counter = 0
         if args['CHECKPOINT'] != None:
             self.load_checkpoint(os.path.join(args['CHECKPOINT']), test)
-        if args['ROBUST_TRAIN']:
-            for param in model.parameters():
-                param.requires_grad = False
-            for param in model.robust_module.parameters():
-                param.requires_grad = True
-        # model.robust_module = None
 
     def training_step(self, batch):
         self.model.train()
         self.optimizer.zero_grad()
-        images, labels, edges, names, tf = batch[0].to(dtype=torch.float, device=self.device), \
+        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
             batch[1].to(dtype=torch.long, device=self.device), \
-        batch[2].to(dtype=torch.float, device=self.device), batch[3], \
-        batch[4].to(dtype=torch.float, device=self.device) if self.robust_train else None
+        batch[2].to(dtype=torch.float, device=self.device), batch[3]
         with torch.autocast(device_type=self.device, dtype=torch.float16, enabled=self.use_amp):
-            output = self.model(images, tf)
+            output = self.model(images)
             output_mask = F.interpolate(
                                 output[1],
                                 size=[images.shape[-2], images.shape[-1]],
                                 mode='bilinear', align_corners=True)
-            losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges, tf)
+            losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
         loss = losses.mean()
         self.scaler.scale(loss).backward()
@@ -65,32 +57,30 @@ class Trainer:
 
     def valid_step(self, batch):
         self.model.eval()
-        images, labels, edges, names, tf = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3], \
-        batch[4].to(dtype=torch.float, device=self.device) if self.robust_train else None
-        output = self.model(images, tf)
+        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
+        output = self.model(images)
         output_mask = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges, tf)
+        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
         loss = losses.mean()
         return loss.detach(), conf_mat
 
     
     def test_step(self, batch):
         self.model.eval()
-        images, labels, edges, names, tf = batch[0].to(dtype=torch.float, device=self.device), \
-            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3], \
-        batch[4].to(dtype=torch.float, device=self.device) if self.robust_train else None
-        output = self.model(images, tf)
+        images, labels, edges, names = batch[0].to(dtype=torch.float, device=self.device), \
+            batch[1].to(dtype=torch.long, device=self.device), batch[2].to(dtype=torch.float, device=self.device), batch[3]
+        output = self.model(images)
         output_mask = F.interpolate(
                             output[1],
                             size=[images.shape[-2], images.shape[-1]],
                             mode='bilinear', align_corners=True)
         conf_mat = get_confusion_matrix(labels, output_mask, self.num_classes, ignore=self.ingore_label)
-        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges, tf)
+        losses, _, acc, loss_list = self.criterion.get_loss(output, labels, edges)
         loss = losses.mean()
         return loss.detach(), conf_mat
 
@@ -177,7 +167,6 @@ def get_dataset(args, test=False):
                           bd_dilate_size=4,
                           mode=args['MODE'],
                           blend_images=args['BLEND_IMGS'],
-                          robust_train=args['ROBUST_TRAIN'],
                           comp_mask=args['COMP_MASK'],
                           single_source=args['SINGLE_SOURCE'],
                           seed=args['SEED']
@@ -195,7 +184,6 @@ def get_dataset(args, test=False):
                           bd_dilate_size=4,
                           mode=args['MODE'],
                           blend_images=False,
-                          robust_train=args['ROBUST_TRAIN'],
                           comp_mask=False,
                           single_source=False,
                           seed=args['SEED'])
@@ -212,7 +200,6 @@ def get_dataset(args, test=False):
                         bd_dilate_size=4,
                         mode=args['MODE'],
                         blend_images=False,
-                        robust_train=args['ROBUST_TRAIN'],
                         comp_mask=False,
                         single_source=False,
                         seed=args['SEED'])
@@ -227,7 +214,7 @@ def get_model(args):
     elif 'pidnet_l' == args['MODEL']:
         model = PIDNet(m=3, n=4, num_classes=args['NUM_CLASSES'], planes=64, ppm_planes=112, head_planes=256, augment=True, channels=channels[args['MODE']])
     elif 'robofire' == args['MODEL']:
-        model = RoboFireFuseNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'], robust_module=args['ROBUST_TRAIN'])
+        model = RoboFireFuseNet(m=2, n=3, num_classes=args['NUM_CLASSES'], planes=32, ppm_planes=96, head_planes=128, augment=True, channels=channels[args['MODE']], input_resolution=args['CROP_SIZE'], window_size=(args['WINDOW_SIZE'], args['WINDOW_SIZE']), tf_depths=args['TF_CONFIG'])
     if args['PRETRAINED'] is not None:
         model.imgnet_pretrain(args['PRETRAINED'])
     model.to(device=args['DEVICE'])

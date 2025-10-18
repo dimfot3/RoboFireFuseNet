@@ -156,7 +156,7 @@ class PIDNet(nn.Module):
         return 0
 
 
-    def forward(self, x, tf=None):
+    def forward(self, x):
         x = self.conv1(x)
         x = self.layer1(x)
         x = self.relu(self.layer2(self.relu(x)))
@@ -199,7 +199,7 @@ class PIDNet(nn.Module):
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             x_extra_d = self.seghead_d(temp_d)
-            return [x_extra_p, x_, x_extra_d, None]
+            return [x_extra_p, x_, x_extra_d]
         else:
             return x_
     

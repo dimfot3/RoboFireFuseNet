@@ -17,7 +17,6 @@ from Swin2 import Swinv2Model, Swinv2Stage, Swinv2PatchMerging, Swinv2Embeddings
 from einops.layers.torch import Rearrange
 BatchNorm2d = nn.BatchNorm2d
 from pidnet import PIDNet
-from robust_module import RobustModule
 bn_mom = 0.1
 algc = False
 
@@ -73,19 +72,17 @@ def drop_path(x, drop_prob=0.2, training=True):
 
 class RoboFireFuseNet(nn.Module):
 
-    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), tf_depths=(2, 6), robust_module=False):
+    def __init__(self, m=2, n=3, num_classes=19, planes=64, ppm_planes=96, head_planes=128, augment=True, channels=3, input_resolution=(480, 640), window_size=(10, 5), tf_depths=(2, 6)):
         super(RoboFireFuseNet, self).__init__()
         self.augment = augment
         self.channels = channels
         self.window_size = window_size
         self.planes = planes
         input_resolution = np.array(input_resolution)
-        self.robust_module =  None
         self.norm = 'group'
         self.drop_paths_modalities = [0.2, 0.2, 0]  if  num_classes==3 else [0, 0, 0]   # rgb, ir, fusion
         self.drop_paths_shortcuts = [0.15, 0.15, 0.15, 0.15] if  num_classes==3 else [0, 0, 0, 0]    # 0, 1, 2
-        if robust_module:
-            self.robust_module = RobustModule(planes*2, h=input_resolution[0]//8, w=input_resolution[1]//8)
+    
 
         # I Branch
         self.conv1_rgb_0 =  nn.Sequential(
@@ -301,8 +298,7 @@ class RoboFireFuseNet(nn.Module):
         self.load_state_dict(model_dict, strict = False)
         print(msg)
 
-    def forward(self, x, tf=None):
-        x_inter = []        
+    def forward(self, x):
         # layer0 rgb
         x_rgb_0 = self.conv1_rgb_0(x[:, :3])        #/1
         x_rgb_1 = self.conv1_rgb_1(x_rgb_0)         #/2
@@ -323,23 +319,7 @@ class RoboFireFuseNet(nn.Module):
         # layer2 ir
         x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
         x_ir = x_ir_3
-        
-        if self.robust_module is not None:
-            x_ir_new, x_rgb_ir, tf_new = self.robust_module(x_rgb, x_ir, tf=None)
-            tf = tf_new #if tf is None else tf
-            x_inter = [x_ir, x_ir_new, x_rgb_ir, tf]
-            grid = F.affine_grid(tf, x_irinp.size(), align_corners=False)
-            x_irinp = F.grid_sample(x_irinp, grid, mode='nearest', align_corners=False, padding_mode='zeros')
-            x_ir_0 = self.conv1_ir_0(x_irinp)
-            x_ir_1 = self.conv1_ir_1(x_ir_0)
-            x_ir_2 = self.conv1_ir_2(x_ir_1)
-            # layer1 ir
-            x_ir_2 = self.layer1_ir(x_ir_2)
-            # layer2 ir
-            x_ir_3 = self.relu(self.layer2_ir(self.relu(x_ir_2)))
-            x_ir = x_ir_3
-            x_inter = [x_ir, x_ir_new, x_rgb_ir, tf]
-
+    
 
         x = self.weight_channels_pre(torch.cat((x_rgb, x_ir), dim=1))
         
@@ -406,7 +386,7 @@ class RoboFireFuseNet(nn.Module):
         if self.augment: 
             x_extra_p = self.seghead_p(temp_p)
             x_extra_d = self.seghead_d(temp_d)
-            return [x_extra_p, x_, x_extra_d, x_inter]
+            return [x_extra_p, x_, x_extra_d]
         else:
             return x_
     
@@ -465,7 +445,7 @@ if __name__ == '__main__':
     num_classes = 3
     depths= [2, 6]
     
-    model = RoboFireFuseNet(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths, robust_module=False).to(device)
+    model = RoboFireFuseNet(m=2, n=3, num_classes=num_classes, planes=32, ppm_planes=96, head_planes=128, augment=True, channels=4, input_resolution=input_res, window_size=(windows_size, windows_size), tf_depths=depths).to(device)
     model.eval()
     input = torch.randn(1, 4, *input_res).to(device)
     avg = 0

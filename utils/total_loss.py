@@ -239,21 +239,7 @@ class TotalLoss:
         self.miou_ce = LovaszCE(self.class_weights)
         self.mse_loss = nn.MSELoss()
         self.loss_params = torch.nn.SmoothL1Loss()
-        
-        self.affine_loss = lambda tf_pred, tf_gt: torch.nn.functional.mse_loss(tf_pred, tf_gt)
-        self.transformation_consistency_loss = lambda x_ir_new, x_ir, tf: torch.nn.functional.mse_loss(
-            F.grid_sample(x_ir_new, F.affine_grid(tf, x_ir_new.size(), align_corners=False), align_corners=False),
-            x_ir
-        )
-        self.cosine_similarity_loss = lambda x_ir_new, x_rgb_ir: 1 - torch.nn.functional.cosine_similarity(
-            x_ir_new, x_rgb_ir, dim=-1
-        ).mean()
-        self.mse_loss = lambda x_ir_new, x_rgb_ir: torch.nn.functional.mse_loss(x_ir_new, x_rgb_ir)
-        self.geometric_alignment_loss = lambda x_ir_new, x_ir, tf_pred: torch.nn.functional.mse_loss(
-            F.grid_sample(x_ir, F.affine_grid(tf_pred, x_ir.size(), align_corners=False), align_corners=False),
-            x_ir_new
-        )
-
+    
         if args['USE_OHEM']:
             self.sem_criterion = OhemCrossEntropy(args, ignore_label=args['IGNORE_LABEL'],
                                         thres=args['OHEMTHRES'],
@@ -282,7 +268,7 @@ class TotalLoss:
         acc = np.array([acc, *acc_per_class])
         return acc
 
-    def get_loss(self, outputs, labels, bd_gt, tf=None):
+    def get_loss(self, outputs, labels, bd_gt):
         """
         Calculates total prediction loss, including semantic loss (using OHEM or cross-entropy), 
         boundary loss (using CE), and additional semantic loss for detected boundaries.
@@ -290,10 +276,6 @@ class TotalLoss:
         the avg pixel accuracy and the segmentation and boundary losses.
         """
         loss = torch.tensor(0).to(labels.device).to(torch.float)
-        robust_out, outputs = outputs[-1], outputs[:-1]
-        if tf != None:
-            x_ir, x_ir_new, x_rgb_ir, tf_pred = robust_out
-            loss += 100*self.affine_loss(tf_pred, tf)
         h, w = labels.size(1), labels.size(2)
         ph, pw = outputs[0].size(2), outputs[0].size(3)
         if (ph != h) or (pw != w):
