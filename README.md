@@ -4,6 +4,11 @@ This is the official repository for **RoboFireFuseNet: Robust Fusion of Visible 
 
 Developed for the fire segmentation module of the EU Horizon TEMA project, RoboFireFuseNet is a high-efficiency neural network designed for edge deployment. It targets three fundamental computer vision hurdles: small object segmentation, extreme class imbalance, and asymmetric RGB-IR fusion under inter-modality occlusion. This specialized fusion architecture ensures robust feature integration even when one sensor’s line of sight is obstructed, allowing the model to maintain peak performance in real time.
 
+<div align="center">
+  <img src="figs/thubnail_img.png" width="300" alt="RoboFireFuseNet Thumbnail" />
+  <img src="figs/Highlight.png" width="415" alt="RoboFireFuseNet Highlights Overview" />
+</div>
+
 ## Abstract
 Concurrent image segmentation of ﬂames and smoke is challenging, as smoke frequently obscures ﬁre in standard
 RGB imagery, necessitating the use of other spectral bands such as Infrared (IR). Existing multimodal models are
