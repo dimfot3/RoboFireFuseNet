@@ -80,7 +80,7 @@ Our model enhances PIDNet-Small by integrating SwinV2-T Transformer blocks, impr
 ### 0. Setup
 - Install python requirements: `pip install -r requirements.txt` or recommender `Python 3.10.12`
 - Download the [weights](https://drive.google.com/drive/folders/1wldeSDx5VVjynABJqm55RDREAnPonk5y?usp=sharing) inside the weights folder.
-- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on public FLAME2 dataset.
+- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset.
 - Download the [split](https://drive.google.com/file/d/15zglyds0vFhUJmwbwXorlszqs5jZ-ga7/view?usp=sharing) from Corsican.
   
 ### 2. Training
