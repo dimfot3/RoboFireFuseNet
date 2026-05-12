@@ -151,5 +151,3 @@ This repository contains subsets of the following third-party datasets:
 
 1. **FLAME 2 Dataset <sup>[[2]](#2)</sup>:** Used and redistributed under the **CC BY 4.0 license** (Hopkins et al., 2022). [Source](https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset)
 2. **MFNet Dataset <sup>[[3]](#3)</sup>:** Used for research and benchmarking purposes (Ha et al., 2017). The original images are provided by the University of Tokyo, Harada Lab. [Source](https://www.mi.t.u-tokyo.ac.jp/static/projects/mil_multispectral/)
-
-**Citation Requirement:** If you use this work, you must cite our RoboFireFuseNet paper as well as the original sources for FLAME 2 <sup>[[2]](#2)</sup> and MFNet <sup>[[3]](#3)</sup> listed in the References section.
