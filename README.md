@@ -80,8 +80,8 @@ Our model enhances PIDNet-Small by integrating SwinV2-T Transformer blocks, impr
 ### 0. Setup
 - Install python requirements: `pip install -r requirements.txt` or recommender `Python 3.10.12`
 - Download the [weights](https://drive.google.com/drive/folders/1wldeSDx5VVjynABJqm55RDREAnPonk5y?usp=sharing) inside the weights folder.
-- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset <sup>[[2]](#2)</sup> (see Licensing for details).
-- Download the [split](https://drive.google.com/file/d/15zglyds0vFhUJmwbwXorlszqs5jZ-ga7/view?usp=sharing) from Corsican.
+- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset <sup>[[2]](#2)</sup> (see Licensing for details), preprocessed MFNet dataset <sup>[[3]](#3)</sup>.
+- Download the [split](https://drive.google.com/file/d/15zglyds0vFhUJmwbwXorlszqs5jZ-ga7/view?usp=sharing) for Corsican <sup>[[4]](#4)</sup> and also download the original Corsican from original site.
   
 ### 2. Training
 Customize configurations via the config/ folder or override them with inline arguments.
