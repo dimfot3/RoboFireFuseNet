@@ -137,7 +137,8 @@ This research was funded by the European Union’s Horizon Europe research and i
 
 <a id="1">[1]</a> : PIDnet: Xu, Jiacong et al. “PIDNet: A Real-time Semantic Segmentation Network Inspired by PID Controllers.” 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022): 19529-19539. </br>
 <a id="2">[2]</a> : Bryce Hopkins, Leo O'Neill, Fatemeh Afghah, Abolfazl Razi, Eric Rowell, Adam Watts, Peter Fule, Janice Coen, "FLAME 2: Fire detection and modeLing: Aerial Multi-spectral imagE dataset", IEEE Dataport, August 30, 2022, doi:10.21227/swyw-6j78 </br>
-<a id="3">[3]</a> : Karasawa Takumi, Kohei Watanabe, Qishen Ha, Antonio Tejero-De-Pablos, Yoshitaka Ushiku, and Tatsuya Harada. 2017. Multispectral Object Detection for Autonomous Vehicles. In Proceedings of the on Thematic Workshops of ACM Multimedia 2017 (Thematic Workshops '17). Association for Computing Machinery, New York, NY, USA, 35–43. https://doi.org/10.1145/3126686.3126727 </br> 
+<a id="3">[3]</a> : Q. Ha, K. Watanabe, T. Karasawa, Y. Ushiku and T. Harada, "MFNet: Towards real-time semantic segmentation for autonomous vehicles with multi-spectral scenes," 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Vancouver, BC, Canada, 2017, pp. 5108-5115, doi: 10.1109/IROS.2017.8206396.
+</br> 
 <a id="4">[4]</a> : Tom Toulouse, Lucile Rossi, Antoine A Campana, Turgay A Celik, Moulay A Akhloufi. Computer vision
 for wildfire research: An evolving image dataset for processing and analysis. Fire Safety Journal, 2017, 92,
 pp.188-194. ⟨10.1016/j.firesaf.2017.06.012⟩. ⟨hal-01560570⟩
