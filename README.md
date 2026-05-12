@@ -80,7 +80,7 @@ Our model enhances PIDNet-Small by integrating SwinV2-T Transformer blocks, impr
 ### 0. Setup
 - Install python requirements: `pip install -r requirements.txt` or recommender `Python 3.10.12`
 - Download the [weights](https://drive.google.com/drive/folders/1wldeSDx5VVjynABJqm55RDREAnPonk5y?usp=sharing) inside the weights folder.
-- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset.
+- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset (see Licensing for details).
 - Download the [split](https://drive.google.com/file/d/15zglyds0vFhUJmwbwXorlszqs5jZ-ga7/view?usp=sharing) from Corsican.
   
 ### 2. Training
@@ -137,3 +137,16 @@ This research was funded by the European Union’s Horizon Europe research and i
 
 <a id="1">[1]</a> : PIDnet: Xu, Jiacong et al. “PIDNet: A Real-time Semantic Segmentation Network Inspired by PID Controllers.” 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022): 19529-19539. </br>
 <a id="2">[2]</a> : Bryce Hopkins, Leo O'Neill, Fatemeh Afghah, Abolfazl Razi, Eric Rowell, Adam Watts, Peter Fule, Janice Coen, "FLAME 2: Fire detection and modeLing: Aerial Multi-spectral imagE dataset", IEEE Dataport, August 30, 2022, doi:10.21227/swyw-6j78
+
+## License & Data Attribution
+
+### Software & Masks
+The code and the newly generated segmentation masks in this repository are licensed under the **MIT License** (see the [LICENSE](LICENSE) file).
+
+### Original Image Data (FLAME 2)
+The images included in the `data/` folder are a curated subset of the **FLAME 2 Dataset**. 
+* **License:** [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+* **Original Authors:** Hopkins et al. (2022)
+* **Modifications:** We have selected specific RGB/IR pairs and provided high-precision manual segmentation for fire and smoke.
+
+**Important:** If you use this repository, you must cite both the original FLAME 2 work and our RoboFireFuseNet paper.
