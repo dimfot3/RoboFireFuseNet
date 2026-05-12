@@ -24,5 +24,7 @@ SOFTWARE.
 Data Licensing & Attribution
 The segmentation masks and code in this repository are licensed under the MIT License.
 
-The images included are a subset of the FLAME 2 dataset (Hopkins et al., 2022) and are
-redistributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license.
+The images included are a subset of the FLAME 2 dataset  (Hopkins et al., 2022) 
+(https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset) and are
+redistributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license:
+https://creativecommons.org/licenses/by/4.0/.
