@@ -136,15 +136,19 @@ This research was funded by the European Union’s Horizon Europe research and i
 ## References
 
 <a id="1">[1]</a> : PIDnet: Xu, Jiacong et al. “PIDNet: A Real-time Semantic Segmentation Network Inspired by PID Controllers.” 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022): 19529-19539. </br>
-<a id="2">[2]</a> : Bryce Hopkins, Leo O'Neill, Fatemeh Afghah, Abolfazl Razi, Eric Rowell, Adam Watts, Peter Fule, Janice Coen, "FLAME 2: Fire detection and modeLing: Aerial Multi-spectral imagE dataset", IEEE Dataport, August 30, 2022, doi:10.21227/swyw-6j78
+<a id="2">[2]</a> : Bryce Hopkins, Leo O'Neill, Fatemeh Afghah, Abolfazl Razi, Eric Rowell, Adam Watts, Peter Fule, Janice Coen, "FLAME 2: Fire detection and modeLing: Aerial Multi-spectral imagE dataset", IEEE Dataport, August 30, 2022, doi:10.21227/swyw-6j78 </br>
+<a id="3">[3]</a> : Karasawa Takumi, Kohei Watanabe, Qishen Ha, Antonio Tejero-De-Pablos, Yoshitaka Ushiku, and Tatsuya Harada. 2017. Multispectral Object Detection for Autonomous Vehicles. In Proceedings of the on Thematic Workshops of ACM Multimedia 2017 (Thematic Workshops '17). Association for Computing Machinery, New York, NY, USA, 35–43. https://doi.org/10.1145/3126686.3126727 </br> 
+<a id="4">[4]</a> : Tom Toulouse, Lucile Rossi, Antoine A Campana, Turgay A Celik, Moulay A Akhloufi. Computer vision
+for wildfire research: An evolving image dataset for processing and analysis. Fire Safety Journal, 2017, 92,
+pp.188-194. ⟨10.1016/j.firesaf.2017.06.012⟩. ⟨hal-01560570⟩
 
-## License & Data Attribution
+## LICENCE
 
 The code and segmentation masks for FLAME2 in this repository are licensed under the **MIT License**. 
 
 This repository contains subsets of the following third-party datasets:
 
-1. **FLAME 2 Dataset:** Used and redistributed under the **CC BY 4.0 license** (Hopkins et al., 2022). [Source](https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset)
-2. **MFNet Dataset:** Used for research and benchmarking purposes (Ha et al., 2017). The original images are provided by the University of Tokyo, Harada Lab. [Source](https://www.mi.t.u-tokyo.ac.jp/static/projects/mil_multispectral/)
+1. **FLAME 2 Dataset <sup>[[2]](#2)</sup>:** Used and redistributed under the **CC BY 4.0 license** (Hopkins et al., 2022). [Source](https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset)
+2. **MFNet Dataset <sup>[[3]](#3)</sup>:** Used for research and benchmarking purposes (Ha et al., 2017). The original images are provided by the University of Tokyo, Harada Lab. [Source](https://www.mi.t.u-tokyo.ac.jp/static/projects/mil_multispectral/)
 
-**Citation Requirement:** If you use this work, you must cite our RoboFireFuseNet paper as well as the original sources for FLAME 2 and MFNet listed in the References section.
+**Citation Requirement:** If you use this work, you must cite our RoboFireFuseNet paper as well as the original sources for FLAME 2 <sup>[[2]](#2)</sup> and MFNet <sup>[[3]](#3)</sup> listed in the References section.
