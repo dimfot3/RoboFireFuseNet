@@ -29,7 +29,7 @@ multimodal fusion makes RFFNet well-suited for proactive and accurate wildﬁre 
 
 ## Highlights
 
-- 🔄 **Hybrid Multimodal Architecture**: Integrates SwinV2-T Transformer blocks within a PIDNet-Small backbone. This dual-pathway design preserves modality-specific (RGB-IR) representations while capturing long-range global dependencies for robust feature fusion.
+- 🔄 **Hybrid Multimodal Architecture**: Integrates SwinV2-T Transformer blocks within a PIDNet-Small backbone <sup>[[1]](#1)</sup>. This dual-pathway design preserves modality-specific (RGB-IR) representations while capturing long-range global dependencies for robust feature fusion.
 - ⚡ **Real-Time Inference Optimization**: Engineered for high-throughput deployment in proactive UAV/drone-based monitoring. Achieves strict real-time processing speeds on consumer hardware without sacrificing segmentation integrity.
 - 🔥 **Robust Target Extraction**: Employs a detail-preserving U-Net-style decoder tailored for sparse, fine-grained fire patterns. Maintains exceptionally high recall and spatial reconstruction accuracy even under severe, real-world smoke occlusion.
 - 🎯 **Parameter-Efficient Design**: Attains state-of-the-art accuracy with only 29.5M parameters. It robustly handles both smoke-occluded wildfire scenarios (88.17% MIoU on FLAME2) and datasets featuring small targets and severe class imbalance (60.6% MIoU on MFNet), offering a vastly superior compute-to-accuracy ratio.
@@ -80,7 +80,7 @@ Our model enhances PIDNet-Small by integrating SwinV2-T Transformer blocks, impr
 ### 0. Setup
 - Install python requirements: `pip install -r requirements.txt` or recommender `Python 3.10.12`
 - Download the [weights](https://drive.google.com/drive/folders/1wldeSDx5VVjynABJqm55RDREAnPonk5y?usp=sharing) inside the weights folder.
-- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset (see Licensing for details).
+- Download the preprocessed [data](https://drive.google.com/drive/folders/15bsStvQWBpMY1bXW3Wi-uliczz1-Zko8?usp=drive_link) inside the data folder. We include our annotations on subset of public FLAME2 dataset <sup>[[2]](#2)</sup> (see Licensing for details).
 - Download the [split](https://drive.google.com/file/d/15zglyds0vFhUJmwbwXorlszqs5jZ-ga7/view?usp=sharing) from Corsican.
   
 ### 2. Training
@@ -144,9 +144,9 @@ This research was funded by the European Union’s Horizon Europe research and i
 The code and the newly generated segmentation masks in this repository are licensed under the **MIT License** (see the [LICENSE](LICENSE) file).
 
 ### Original Image Data (FLAME 2)
-The images included in the `data/` folder are a curated subset of the **FLAME 2 Dataset**. 
+The images included in the `data/` folder are a curated subset of the **FLAME 2 Dataset** <sup>[[2]](#2)</sup>. 
 * **License:** [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 * **Original Authors:** Hopkins et al. (2022)
 * **Modifications:** We have selected specific RGB/IR pairs and provided high-precision manual segmentation for fire and smoke.
 
-**Important:** If you use this repository, you must cite both the original FLAME 2 work and our RoboFireFuseNet paper.
+**Important:** If you use this repository, you must cite both the original FLAME 2 <sup>[[2]](#2)</sup> work and our RoboFireFuseNet paper.
