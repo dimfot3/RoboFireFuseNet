@@ -140,13 +140,11 @@ This research was funded by the European Union’s Horizon Europe research and i
 
 ## License & Data Attribution
 
-### Software & Masks
-The code and the newly generated segmentation masks in this repository are licensed under the **MIT License** (see the [LICENSE](LICENSE) file).
+The code and segmentation masks for FLAME2 in this repository are licensed under the **MIT License**. 
 
-### Original Image Data (FLAME 2)
-The images included in the `data/` folder are a curated subset of the **FLAME 2 Dataset** <sup>[[2]](#2)</sup>. 
-* **License:** [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
-* **Original Authors:** Hopkins et al. (2022)
-* **Modifications:** We have selected specific RGB/IR pairs and provided high-precision manual segmentation for fire and smoke.
+This repository contains subsets of the following third-party datasets:
 
-**Important:** If you use this repository, you must cite both the original FLAME 2 <sup>[[2]](#2)</sup> work and our RoboFireFuseNet paper.
+1. **FLAME 2 Dataset:** Used and redistributed under the **CC BY 4.0 license** (Hopkins et al., 2022). [Source](https://ieee-dataport.org/open-access/flame-2-fire-detection-and-modeling-aerial-multi-spectral-image-dataset)
+2. **MFNet Dataset:** Used for research and benchmarking purposes (Ha et al., 2017). The original images are provided by the University of Tokyo, Harada Lab. [Source](https://www.mi.t.u-tokyo.ac.jp/static/projects/mil_multispectral/)
+
+**Citation Requirement:** If you use this work, you must cite our RoboFireFuseNet paper as well as the original sources for FLAME 2 and MFNet listed in the References section.
