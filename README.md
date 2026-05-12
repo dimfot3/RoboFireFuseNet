@@ -143,7 +143,7 @@ This research was funded by the European Union’s Horizon Europe research and i
 for wildfire research: An evolving image dataset for processing and analysis. Fire Safety Journal, 2017, 92,
 pp.188-194. ⟨10.1016/j.firesaf.2017.06.012⟩. ⟨hal-01560570⟩
 
-## LICENCE
+## Licences
 
 The code and segmentation masks for FLAME2 in this repository are licensed under the **MIT License**. 
 
