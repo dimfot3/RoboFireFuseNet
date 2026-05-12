@@ -133,7 +133,7 @@ If you find this code or research helpful in your work, please cite our paper:
 
 This research was funded by the European Union’s Horizon Europe research and innovation programme under the **TEMA** project (Grant Agreement No. 101093003, HORIZON-CL4-2022-DATA-01-01).
 
----
+## References
 
 <a id="1">[1]</a> : PIDnet: Xu, Jiacong et al. “PIDNet: A Real-time Semantic Segmentation Network Inspired by PID Controllers.” 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022): 19529-19539. </br>
 <a id="2">[2]</a> : Bryce Hopkins, Leo O'Neill, Fatemeh Afghah, Abolfazl Razi, Eric Rowell, Adam Watts, Peter Fule, Janice Coen, "FLAME 2: Fire detection and modeLing: Aerial Multi-spectral imagE dataset", IEEE Dataport, August 30, 2022, doi:10.21227/swyw-6j78
