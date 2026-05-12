@@ -26,4 +26,4 @@ The segmentation masks and code in this repository are licensed under the MIT Li
 
 FLAME 2 Images: The images included are a subset of the FLAME 2 dataset (Hopkins et al., 2022) and are redistributed under the Creative Commons Attribution 4.0 International (CC BY 4.0) license.
 
-MFNet Images: The images included in the urban benchmark folder are a subset of the MFNet dataset (Ha et al., 2017). These are redistributed for non-commercial research and benchmarking purposes. The original dataset is provided by the University of Tokyo, Harada Lab.
+MFNet Images: The images included in the urban benchmark folder are a subset of the MFNet dataset (Ha et al., 2017). These are redistributed for non-commercial research and benchmarking purposes. The original dataset was introduced in: "MFNet: Towards real-time semantic segmentation for autonomous vehicles with multi-spectral scenes," IROS 2017.
